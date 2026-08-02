@@ -122,12 +122,13 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-slate-50 text-slate-900; /* Ganti bg-background dengan bg-slate-50 */
   }
   html {
     @apply font-sans;
   }
 }
+
 /* Keyframe Animasi HP: Tumbuh dari Kiri ke Kanan */
 /* Animasi Garis Pemisah Desktop */
 @keyframes lineExpandDesktop {
@@ -147,9 +148,20 @@
 .animate-line-desktop {
   animation: lineExpandDesktop 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
 /* Sembunyikan semua floating button di kanan bawah */
 button[class*="fixed"][class*="bottom-"],
 div[class*="fixed"][class*="bottom-"],
 a[class*="fixed"][class*="bottom-"] {
   display: none !important;
+}
+/* PAKSA WARNA TERANG DI SELURUH WEB */
+:root {
+  --background: 210 40% 98% !important;
+  --foreground: 222.2 84% 4.9% !important;
+}
+
+html, body, #__next, main {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
 }
