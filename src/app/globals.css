@@ -155,6 +155,7 @@ div[class*="fixed"][class*="bottom-"],
 a[class*="fixed"][class*="bottom-"] {
   display: none !important;
 }
+
 /* PAKSA WARNA TERANG DI SELURUH WEB */
 :root {
   --background: 210 40% 98% !important;
