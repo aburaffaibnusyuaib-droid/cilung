@@ -12,12 +12,10 @@ export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleOpenCart = () => {
-    // Fungsi buka modal/drawer keranjang belanja
     console.log("Buka keranjang");
   };
 
   const handleOrderClick = () => {
-    // Scroll otomatis ke section Menu pas tombol di Hero diklik
     const menuElement = document.getElementById('menu');
     if (menuElement) {
       menuElement.scrollIntoView({ behavior: 'smooth' });
@@ -25,17 +23,15 @@ export default function Home() {
   };
 
   const handleSelectPackage = (selectedItem) => {
-    // Simpan paket yang dipilih & Buka Modal Racik Bumbu
     setSelectedProduct(selectedItem);
     setIsModalOpen(true);
 
-    // Tambah counter cart safe-check (jika dari item langsung/pop-up)
     const qtyToAdd = selectedItem?.quantity || 1;
     setCartCount(prev => prev + qtyToAdd);
   };
 
   return (
-    <main className="min-h-screen bg-slate-50">
+    <main className="min-h-screen bg-[#070a11] text-slate-100 overflow-x-hidden relative">
       {/* Navbar */}
       <Navbar 
         cartCount={cartCount} 
@@ -47,14 +43,19 @@ export default function Home() {
         onOrderClick={handleOrderClick} 
       />
 
-      {/* Menu */}
-      <Menu 
-        onSelectPackage={handleSelectPackage} 
-      />
-      {/* Footer */}
-      <Footer />
+      {/* Menu - Dibungkus isolasi biar warna merah gak meluber ke footer */}
+      <div className="relative z-10 w-full overflow-hidden">
+        <Menu 
+          onSelectPackage={handleSelectPackage} 
+        />
+      </div>
 
-      {/* MODAL / POP-UP RACIK BUMBU (Siap dihubungkan) */}
+      {/* Footer - Kunci z-index 30 biar lepas dari kejebak overlay atas */}
+      <div className="relative z-30 w-full bg-[#070a11] overflow-hidden">
+        <Footer />
+      </div>
+
+      {/* MODAL / POP-UP RACIK BUMBU */}
       {/* {isModalOpen && (
         <RacikModal 
           product={selectedProduct} 
