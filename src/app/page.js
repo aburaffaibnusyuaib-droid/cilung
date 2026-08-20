@@ -17,23 +17,26 @@ export default function Home() {
 
   const cartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
 
-  // HANDLER BUKA POP-UP DARI CARD MENU (DESAIN TETAP SAMA)
+  // 1. HANDLER BUKA RACIK MODAL DARI MENU
   const handleSelectPackage = (selectedItem) => {
+    console.log("👉 1. MENU DIKLIK! Data diterima:", selectedItem);
     setEditingIndex(null);
     setSelectedProduct(selectedItem);
     setIsModalOpen(true);
   };
 
-  // HANDLER EDIT DARI KERANJANG
+  // 2. HANDLER EDIT ITEM DARI KERANJANG
   const handleEditItem = (index) => {
+    console.log("👉 EDIT ITEM INDEX:", index);
     setEditingIndex(index);
     setSelectedProduct(cartItems[index]);
     setIsCartOpen(false);
     setIsModalOpen(true);
   };
 
-  // SIMPAN PESANAN (TAMBAH BARU / EDIT)
+  // 3. TAMBAH / SIMPAN PERUBAHAN KE KERANJANG
   const handleAddToCart = (orderData) => {
+    console.log("👉 MASUK KERANJANG:", orderData);
     if (editingIndex !== null) {
       setCartItems((prev) => {
         const updated = [...prev];
@@ -48,7 +51,7 @@ export default function Home() {
     setIsModalOpen(false);
   };
 
-  // UPDATE QUANTITY
+  // 4. UPDATE QUANTITY PORSI (+ / -)
   const handleUpdateQuantity = (index, newQty) => {
     if (newQty < 1) return;
     setCartItems((prev) => {
@@ -59,13 +62,14 @@ export default function Home() {
     });
   };
 
-  // HAPUS ITEM
+  // 5. HAPUS ITEM DARI KERANJANG
   const handleRemoveItem = (index) => {
     setCartItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // KOSONGKAN KERANJANG
+  // 6. KOSONGKAN KERANJANG TOTAL (CHECKOUT WA)
   const handleClearCart = () => {
+    console.log("👉 KERANJANG DIBERSIHKAN!");
     setCartItems([]);
   };
 
@@ -106,7 +110,7 @@ export default function Home() {
         />
       )}
 
-      {/* DRAWER KERANJANG */}
+      {/* DRAWER KERANJANG BELANJA */}
       <Cart 
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
