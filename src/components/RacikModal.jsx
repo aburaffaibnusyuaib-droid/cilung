@@ -1,142 +1,216 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { 
-  X, Plus, Minus, Flame, Check, Sparkles, 
-  Utensils, ShieldCheck, Smile, Zap, Ban, Leaf
-} from 'lucide-react';
+import { X, Plus, Minus, Check, Ban, Leaf, Flame } from 'lucide-react';
 
-export default function RacikModal({ product, onClose, onAddToCart }) {
+/* ================= VECTOR FOOD ICONS ================= */
+const SausageHorizontalIcon = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <rect x="3" y="8" width="18" height="8" rx="4" />
+    <path d="M8 8v8" />
+    <path d="M12 8v8" />
+    <path d="M16 8v8" />
+  </svg>
+);
+
+const BeefSteakIcon = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M19 6.5C17.5 4 13.5 3 9 4.5S3 9 3 13.5c0 4.5 3.5 7.5 8 7.5s9.5-3 9.5-7.5c0-2.5-.5-5-1.5-7z" />
+    <ellipse cx="10" cy="11.5" rx="2.5" ry="1.8" fill="currentColor" fillOpacity="0.2" />
+    <path d="M14 9.5c1.5 1 2.5 3 1.5 5" />
+    <path d="M7 16c1.5.5 3 0 4-.5" />
+  </svg>
+);
+
+const CrabIcon = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <ellipse cx="12" cy="14" rx="5" ry="4" />
+    <path d="M7 11c-2-3-4-2-4 1 0 2 2 3 4 2" />
+    <path d="M17 11c2-3 4-2 4 1 0 2-2 3-4 2" />
+    <path d="M6 15l-3 2" />
+    <path d="M6 17l-2 3" />
+    <path d="M18 15l3 2" />
+    <path d="M18 17l2 3" />
+  </svg>
+);
+
+const CheeseWedgeIcon = ({ className = 'w-4.5 h-4.5' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M3 18h18L18 8 3 13v5z" />
+    <path d="M3 13l15-5" />
+    <circle cx="8" cy="15.5" r="1" fill="currentColor" />
+    <circle cx="14" cy="14" r="1.3" fill="currentColor" />
+    <circle cx="12" cy="11" r="0.8" fill="currentColor" />
+  </svg>
+);
+
+const KatsuobushiIcon = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M5 8c3-3 7 0 9-1s4 4 1 5-6 1-8 3-4-4-2-7z" />
+    <path d="M11 16c2-2 5 0 7-1" />
+  </svg>
+);
+
+const TomatoIcon = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="12" cy="14" r="7.5" />
+    <path d="M12 6.5V3" />
+    <path d="M9.5 5.5c1.5 1 2.5 1 2.5 1s1 0 2.5-1" />
+  </svg>
+);
+
+const MayoSwirlIcon = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M4 9c2.5-3 5.5 3 8 0s4-3 8 0" />
+    <path d="M4 15c2.5-3 5.5 3 8 0s4-3 8 0" />
+  </svg>
+);
+
+/* ================= COMPONENT ================= */
+export default function MenuModal({ product, onClose, onAddToCart }) {
   if (!product) return null;
 
-  // State Pilihan
-  const [quantity, setQuantity] = useState(1);
-  const [customTusuk, setCustomTusuk] = useState(2); // Min 2 tusuk buat Custom Pack
-  const [selectedBumbu, setSelectedBumbu] = useState([]);
-  const [selectedPedas, setSelectedPedas] = useState('Level 0');
-  const [catatan, setCatatan] = useState('');
+  const [quantity, setQuantity] = useState(product.quantity || 1);
+  const [selectedToppings, setSelectedToppings] = useState(product.toppings || []);
+  const [pakaiSayur, setPakaiSayur] = useState(
+    product.sayur !== undefined ? !product.sayur.includes('Tanpa') : true
+  );
+  const [selectedSaus, setSelectedSaus] = useState(product.saus || ['pedas', 'mayones']);
+  const [catatan, setCatatan] = useState(product.catatan || '');
 
-  // Handler Tutup Saat Backdrop Diklik
-  const handleBackdropClick = (e) => {
-    if (e.target === e.currentTarget) {
-      onClose();
+  useEffect(() => {
+    if (product) {
+      setQuantity(product.quantity || 1);
+      setSelectedToppings(product.toppings || []);
+      setPakaiSayur(product.sayur !== undefined ? !product.sayur.includes('Tanpa') : true);
+      setSelectedSaus(product.saus || ['pedas', 'mayones']);
+      setCatatan(product.catatan || '');
     }
+  }, [product]);
+
+  const unitPrice = product.numericPrice || product.unitPrice || 6000;
+  const totalPrice = unitPrice * quantity;
+
+  const handleBackdropClick = (e) => {
+    if (e.target === e.currentTarget) onClose();
   };
 
-  // Config Varian Bumbu + Icon Valid + Dynamic Border Color Glow & Micro Animations
-  const bumbuOptions = [
+  const toppingOptions = [
     { 
-      id: 'balado', 
-      label: 'Balado', 
-      icon: <Flame className="w-4 h-4 text-red-500 group-hover:scale-125 transition-transform duration-300" />,
-      activeStyle: 'border-red-500 bg-red-50/80 text-red-700 shadow-sm shadow-red-200' 
+      id: 'sosis', 
+      label: 'Sosis', 
+      icon: <SausageHorizontalIcon className="w-4 h-4 text-orange-500" />,
+      activeStyle: 'border-orange-500 text-orange-800 bg-orange-50',
+      checkStyle: 'bg-orange-500'
+    },
+    { 
+      id: 'kornet', 
+      label: 'Kornet', 
+      icon: <BeefSteakIcon className="w-4 h-4 text-rose-700" />,
+      activeStyle: 'border-rose-700 text-rose-900 bg-rose-50',
+      checkStyle: 'bg-rose-700'
+    },
+    { 
+      id: 'crabstick', 
+      label: 'Crabstick', 
+      icon: <CrabIcon className="w-4 h-4 text-red-500" />,
+      activeStyle: 'border-red-500 text-red-700 bg-red-50',
+      checkStyle: 'bg-red-500'
     },
     { 
       id: 'keju', 
       label: 'Keju', 
-      icon: <Utensils className="w-4 h-4 text-amber-500 group-hover:rotate-12 transition-transform duration-300" />,
-      activeStyle: 'border-amber-500 bg-amber-50/80 text-amber-800 shadow-sm shadow-amber-200' 
+      icon: <CheeseWedgeIcon className="w-4.5 h-4.5 text-amber-500" />,
+      activeStyle: 'border-amber-500 text-amber-800 bg-amber-50',
+      checkStyle: 'bg-amber-500'
     },
     { 
-      id: 'jagung', 
-      label: 'Jagung Bakar', 
-      icon: <Sparkles className="w-4 h-4 text-yellow-500 group-hover:bounce transition-transform duration-300" />,
-      activeStyle: 'border-yellow-500 bg-yellow-50/80 text-yellow-800 shadow-sm shadow-yellow-200' 
+      id: 'cakalang', 
+      label: 'Katsuobushi', 
+      icon: <KatsuobushiIcon className="w-4 h-4 text-yellow-700" />,
+      activeStyle: 'border-yellow-700 text-yellow-900 bg-yellow-100/50',
+      checkStyle: 'bg-yellow-700'
     },
     { 
-      id: 'asin', 
-      label: 'Asin / Gurih', 
-      icon: <Sparkles className="w-4 h-4 text-slate-500 group-hover:spin transition-transform duration-300" />,
-      activeStyle: 'border-slate-400 bg-slate-100 text-slate-800 shadow-sm shadow-slate-200' 
-    },
-    { 
-      id: 'nori', 
-      label: 'Rumput Laut', 
-      icon: <Leaf className="w-4 h-4 text-emerald-500 group-hover:-translate-y-0.5 transition-transform duration-300" />,
-      activeStyle: 'border-emerald-500 bg-emerald-50/80 text-emerald-800 shadow-sm shadow-emerald-200' 
-    },
-    { 
-      id: 'tanpa', 
-      label: 'Tanpa Bumbu', 
-      icon: <Ban className="w-4 h-4 text-slate-400" />,
-      activeStyle: 'border-slate-400 bg-slate-100 text-slate-600 shadow-sm' 
+      id: 'polos', 
+      label: 'Tanpa Topping', 
+      icon: <Ban className="w-4 h-4 text-slate-400 stroke-[2.2]" />,
+      activeStyle: 'border-slate-400 text-slate-600 bg-slate-50',
+      checkStyle: 'bg-slate-500'
     },
   ];
 
-  // Config Level Pedas dengan Custom Indicator
-  const pedasOptions = [
+  const sausOptions = [
     { 
-      id: 'Level 0', 
-      label: 'Level 0', 
-      desc: 'Tanpa Cabai', 
-      indicator: <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm shadow-emerald-300"></span>,
-      activeStyle: 'border-emerald-500 bg-emerald-50 text-emerald-900 ring-2 ring-emerald-500/20' 
+      id: 'pedas', 
+      label: 'Saus Pedas', 
+      icon: <Flame className="w-4 h-4 text-red-600 stroke-[2.2]" />,
+      activeStyle: 'border-red-600 text-red-700 bg-red-50',
+      checkStyle: 'bg-red-600'
     },
     { 
-      id: 'Level 1', 
-      label: 'Level 1', 
-      desc: 'Pedas Santai', 
-      indicator: <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-sm shadow-amber-200"></span>,
-      activeStyle: 'border-amber-500 bg-amber-50 text-amber-900 ring-2 ring-amber-500/20' 
+      id: 'tomat', 
+      label: 'Saus Tomat', 
+      icon: <TomatoIcon className="w-4 h-4 text-rose-600" />,
+      activeStyle: 'border-rose-500 text-rose-700 bg-rose-50',
+      checkStyle: 'bg-rose-500'
     },
     { 
-      id: 'Level 2', 
-      label: 'Level 2', 
-      desc: 'Pedas Bara', 
-      indicator: <span className="w-2.5 h-2.5 rounded-full bg-orange-500 shadow-sm shadow-orange-300 animate-pulse"></span>,
-      activeStyle: 'border-orange-500 bg-orange-50 text-orange-900 ring-2 ring-orange-500/20' 
+      id: 'mayones', 
+      label: 'Mayones', 
+      icon: <MayoSwirlIcon className="w-4 h-4 text-amber-500" />,
+      activeStyle: 'border-amber-400 text-amber-700 bg-amber-50',
+      checkStyle: 'bg-amber-400'
     },
     { 
-      id: 'Level 3', 
-      label: 'Level 3', 
-      desc: 'Pedas Mampus🔥', 
-      indicator: (
-        <span className="relative flex items-center justify-center shrink-0">
-          <Flame className="w-3.5 h-3.5 text-red-600 fill-red-500 animate-bounce drop-shadow-[0_2px_8px_rgba(239,68,68,0.7)]" />
-        </span>
-      ),
-      activeStyle: 'border-red-600 bg-red-100/80 text-red-950 ring-2 ring-red-600/30' 
+      id: 'tanpasaus', 
+      label: 'Tanpa Saus', 
+      icon: <Ban className="w-4 h-4 text-slate-400 stroke-[2.2]" />,
+      activeStyle: 'border-slate-400 text-slate-600 bg-slate-50',
+      checkStyle: 'bg-slate-500'
     },
   ];
 
-  // Hitung Harga
-  const getUnitPrice = () => {
-    if (product.isCustom) return customTusuk * 1000;
-    if (product.id === 'goceng') return 5000;
-    if (product.id === 'ceban') return 10000;
-    return 5000;
-  };
-
-  const totalPrice = getUnitPrice() * quantity;
-
-  // Handler Bumbu
-  const handleToggleBumbu = (id) => {
-    if (id === 'tanpa') {
-      setSelectedBumbu(['tanpa']);
+  const handleToggleTopping = (id) => {
+    if (id === 'polos') {
+      setSelectedToppings(['polos']);
       return;
     }
-
-    let updated = selectedBumbu.filter((item) => item !== 'tanpa');
+    let updated = selectedToppings.filter((item) => item !== 'polos');
     if (updated.includes(id)) {
       updated = updated.filter((item) => item !== id);
     } else {
       updated.push(id);
     }
-    setSelectedBumbu(updated);
+    setSelectedToppings(updated);
   };
 
-  // Submit Handler
+  const handleToggleSaus = (id) => {
+    if (id === 'tanpasaus') {
+      setSelectedSaus(['tanpasaus']);
+      return;
+    }
+    let updated = selectedSaus.filter((item) => item !== 'tanpasaus');
+    if (updated.includes(id)) {
+      updated = updated.filter((item) => item !== id);
+    } else {
+      updated.push(id);
+    }
+    setSelectedSaus(updated);
+  };
+
   const handleAdd = () => {
     const orderData = {
       ...product,
       quantity,
-      customTusuk: product.isCustom ? customTusuk : null,
-      unitPrice: getUnitPrice(),
+      unitPrice,
       totalPrice,
-      selectedBumbu: selectedBumbu.length > 0 ? selectedBumbu : ['tanpa'],
-      selectedPedas,
+      toppings: selectedToppings.length > 0 ? selectedToppings : ['polos'],
+      sayur: pakaiSayur ? 'Pakai Sayur (Kol & Daun Bawang)' : 'Tanpa Sayur',
+      saus: selectedSaus.length > 0 ? selectedSaus : ['tanpasaus'],
       catatan,
+      editingIndex: product.editingIndex,
     };
 
     if (onAddToCart) onAddToCart(orderData);
@@ -144,125 +218,81 @@ export default function RacikModal({ product, onClose, onAddToCart }) {
   };
 
   return (
-    /* BACKDROP OVERLAY DENGAN EVENT CLICK TO CLOSE */
     <div 
       onClick={handleBackdropClick}
       className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200 cursor-pointer"
     >
-      
-      {/* CARD CONTAINER (FLOATING CARD DENGAN MARGIN/PADDING INSET DI MOBILE) */}
       <div 
-        className="w-full max-w-lg bg-white rounded-3xl shadow-2xl flex flex-col max-h-[85vh] sm:max-h-[85vh] overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200 relative text-slate-800 cursor-default"
-        style={{ fontFamily: 'var(--font-sans), sans-serif' }}
+        className="w-full max-w-xl bg-white rounded-[2rem] shadow-2xl flex flex-col max-h-[85vh] sm:max-h-[90vh] overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200 relative text-slate-800 cursor-default"
       >
-        
-        {/* HEADER MODAL */}
-        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 shrink-0">
-          <div className="flex items-center gap-3.5">
-            <div className="relative w-12 h-12 rounded-2xl overflow-hidden border-2 border-white shadow-md bg-amber-100 shrink-0">
+        {/* Header Modal */}
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-white shrink-0 relative z-10">
+          <div className="flex items-center gap-4">
+            <div className="relative w-14 h-14 rounded-full overflow-hidden border border-slate-200 shadow-sm shrink-0">
               <Image 
-                src={product.image || '/landscapecilung.jpeg'} 
+                src={product.image || '/produk.jpg'} 
                 alt={product.name} 
                 fill 
                 className="object-cover"
               />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h3 
-                  className="text-base sm:text-lg font-black text-slate-900 uppercase tracking-tight"
-                  style={{ fontFamily: 'var(--font-montserrat), sans-serif' }}
-                >
-                  {product.name}
-                </h3>
-              </div>
-              <p 
-                className="text-xs text-red-600 font-extrabold"
-                style={{ fontFamily: 'var(--font-montserrat), sans-serif' }}
-              >
-                {product.isCustom ? `Rp ${(customTusuk * 1000).toLocaleString('id-ID')} (${customTusuk} Tusuk)` : product.price}
+              <h3 className="text-lg sm:text-xl font-black text-slate-900 uppercase tracking-tight leading-none" style={{ fontFamily: "'Montserrat', sans-serif" }}>
+                {product.name}
+              </h3>
+              <p className="text-sm text-red-600 font-black mt-1" style={{ fontFamily: "'Montserrat', sans-serif" }}>
+                {product.price || `Rp ${unitPrice.toLocaleString('id-ID')}`}
               </p>
             </div>
           </div>
 
-          {/* Tombol Silang X dengan Hover Merah */}
           <button
             onClick={onClose}
-            className="group w-8 h-8 rounded-full bg-slate-100 hover:bg-red-600 text-slate-500 hover:text-white flex items-center justify-center transition-all duration-200 shrink-0 active:scale-90 shadow-sm border border-slate-200/80 hover:border-red-600"
-            title="Tutup Modal"
+            className="group w-9 h-9 rounded-full bg-slate-100 hover:bg-red-600 text-slate-500 hover:text-white flex items-center justify-center transition-all duration-200 shrink-0 active:scale-90 hover:scale-105 shadow-sm"
+            aria-label="Tutup"
           >
             <X className="w-4 h-4 group-hover:rotate-90 transition-transform duration-300 stroke-[2.5]" />
           </button>
         </div>
 
-        {/* BODY CONTENT SCROLLABLE */}
-        <div className="p-4 sm:p-6 overflow-y-auto space-y-6 scrollbar-thin scrollbar-thumb-slate-200">
+        {/* Body Content */}
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-7 scrollbar-hide bg-[#fcfcfc]">
           
-          {/* KHUSUS CUSTOM PACK */}
-          {product.isCustom && (
-            <div className="bg-amber-50/80 p-3.5 rounded-2xl border border-amber-200/80 flex items-center justify-between">
-              <div>
-                <span className="text-xs font-black text-amber-950 block uppercase tracking-wide">JUMLAH TUSUK</span>
-                <span className="text-[10px] text-amber-800 font-semibold">Minimal 2 tusuk (@Rp 1.000)</span>
-              </div>
-              <div className="flex items-center gap-3 bg-white p-1 rounded-xl border border-amber-300/80 shadow-sm">
-                <button
-                  onClick={() => setCustomTusuk((prev) => Math.max(2, prev - 1))}
-                  className="w-7 h-7 rounded-lg bg-amber-100 hover:bg-amber-200 flex items-center justify-center text-amber-900 disabled:opacity-40 transition-colors"
-                  disabled={customTusuk <= 2}
-                >
-                  <Minus className="w-3.5 h-3.5" />
-                </button>
-                <span 
-                  className="font-black text-sm text-slate-900 w-6 text-center"
-                  style={{ fontFamily: 'var(--font-montserrat), sans-serif' }}
-                >
-                  {customTusuk}
-                </span>
-                <button
-                  onClick={() => setCustomTusuk((prev) => prev + 1)}
-                  className="w-7 h-7 rounded-lg bg-red-600 hover:bg-red-700 flex items-center justify-center text-white transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* SECTION 1: PILIH BUMBU TABUR */}
-          <div className="space-y-2.5">
-            <div className="flex items-center justify-between">
-              <label 
-                className="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center gap-1.5"
-                style={{ fontFamily: 'var(--font-montserrat), sans-serif' }}
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-spin-slow" />
-                <span>PILIH BUMBU TABUR</span>
+          {/* Section 1: Topping */}
+          <div className="space-y-3.5">
+            <div className="flex items-center justify-between px-1">
+              <label className="text-sm font-black uppercase text-slate-900 tracking-wider" style={{ fontFamily: "'Montserrat', sans-serif" }}>
+                PILIH ISIAN / TOPPING
               </label>
-              <span className="text-[10px] text-slate-400 font-semibold">Bisa racik campur</span>
+              <span className="text-[10px] text-slate-400 font-bold">Bisa racik campur</span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {bumbuOptions.map((bumbu) => {
-                const isSelected = selectedBumbu.includes(bumbu.id);
+            <div className="grid grid-cols-2 gap-2.5">
+              {toppingOptions.map((topping) => {
+                const isSelected = selectedToppings.includes(topping.id);
+
                 return (
                   <button
-                    key={bumbu.id}
-                    onClick={() => handleToggleBumbu(bumbu.id)}
+                    key={topping.id}
+                    onClick={() => handleToggleTopping(topping.id)}
                     type="button"
-                    className={`group py-2.5 px-3 rounded-2xl text-xs font-extrabold border transition-all duration-200 flex items-center justify-between text-left active:scale-95 ${
+                    className={`group py-2.5 px-3.5 rounded-full border transition-all duration-200 flex items-center justify-between text-left active:scale-[0.98] ${
                       isSelected
-                        ? bumbu.activeStyle
-                        : 'bg-slate-50/70 border-slate-200 text-slate-600 hover:bg-white hover:border-slate-300 hover:shadow-sm'
+                        ? `${topping.activeStyle} shadow-sm`
+                        : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 shadow-sm shadow-slate-100/50'
                     }`}
                   >
-                    <div className="flex items-center gap-2">
-                      {bumbu.icon}
-                      <span>{bumbu.label}</span>
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex items-center justify-center w-6 h-6">
+                        {topping.icon}
+                      </div>
+                      <span className={`font-serif text-[13px] ${isSelected ? 'font-black' : 'font-bold'}`}>
+                        {topping.label}
+                      </span>
                     </div>
                     {isSelected && (
-                      <div className="w-4 h-4 rounded-full bg-slate-900 text-white flex items-center justify-center shrink-0 ml-1">
-                        <Check className="w-2.5 h-2.5 stroke-[3]" />
+                      <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 shadow-inner ${topping.checkStyle}`}>
+                        <Check className="w-2.5 h-2.5 text-white stroke-[3.5]" />
                       </div>
                     )}
                   </button>
@@ -271,99 +301,147 @@ export default function RacikModal({ product, onClose, onAddToCart }) {
             </div>
           </div>
 
-          {/* SECTION 2: LEVEL KEPEDASAN */}
-          <div className="space-y-2.5">
-            <label 
-              className="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center gap-1.5"
-              style={{ fontFamily: 'var(--font-montserrat), sans-serif' }}
-            >
-              <Flame className="w-3.5 h-3.5 text-red-600 animate-pulse" />
-              <span>LEVEL KEPEDASAN</span>
-            </label>
+          {/* Section 2: Sayuran */}
+          <div className="space-y-3.5">
+            <div className="px-1">
+              <label className="text-sm font-black uppercase text-slate-900 tracking-wider" style={{ fontFamily: "'Montserrat', sans-serif" }}>
+                SAYURAN (KOL & BAWANG)
+              </label>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() => setPakaiSayur(true)}
+                className={`py-2.5 px-3.5 rounded-full border transition-all duration-200 flex items-center justify-between text-left active:scale-[0.98] ${
+                  pakaiSayur 
+                    ? 'border-emerald-500 text-emerald-700 bg-emerald-50 shadow-sm' 
+                    : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="flex items-center justify-center w-6 h-6">
+                    <Leaf className={`w-4.5 h-4.5 stroke-[2.2] ${pakaiSayur ? 'text-emerald-500' : 'text-slate-400'}`} />
+                  </div>
+                  <span className={`font-serif text-[13px] ${pakaiSayur ? 'font-black' : 'font-bold'}`}>Pakai Sayur</span>
+                </div>
+                {pakaiSayur && (
+                  <div className="w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center shrink-0">
+                    <Check className="w-2.5 h-2.5 text-white stroke-[3.5]" />
+                  </div>
+                )}
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => setPakaiSayur(false)}
+                className={`py-2.5 px-3.5 rounded-full border transition-all duration-200 flex items-center justify-between text-left active:scale-[0.98] ${
+                  !pakaiSayur 
+                    ? 'border-slate-400 text-slate-600 bg-slate-50 shadow-sm' 
+                    : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="flex items-center justify-center w-6 h-6">
+                    <Ban className="w-4.5 h-4.5 stroke-[2.2] text-slate-400" />
+                  </div>
+                  <span className={`font-serif text-[13px] ${!pakaiSayur ? 'font-black' : 'font-bold'}`}>Tanpa Sayur</span>
+                </div>
+                {!pakaiSayur && (
+                  <div className="w-4 h-4 rounded-full bg-slate-500 flex items-center justify-center shrink-0">
+                    <Check className="w-2.5 h-2.5 text-white stroke-[3.5]" />
+                  </div>
+                )}
+              </button>
+            </div>
+          </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {pedasOptions.map((pedas) => {
-                const isSelected = selectedPedas === pedas.id;
+          {/* Section 3: Saus */}
+          <div className="space-y-3.5">
+            <div className="px-1">
+              <label className="text-sm font-black uppercase text-slate-900 tracking-wider" style={{ fontFamily: "'Montserrat', sans-serif" }}>
+                PILIHAN SAUS
+              </label>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5">
+              {sausOptions.map((saus) => {
+                const isSelected = selectedSaus.includes(saus.id);
+
                 return (
                   <button
-                    key={pedas.id}
-                    onClick={() => setSelectedPedas(pedas.id)}
+                    key={saus.id}
+                    onClick={() => handleToggleSaus(saus.id)}
                     type="button"
-                    className={`p-2.5 rounded-2xl border transition-all duration-200 flex flex-col items-center justify-center gap-1.5 active:scale-95 relative overflow-hidden ${
+                    className={`group py-2.5 px-3.5 rounded-full border transition-all duration-200 flex items-center justify-between text-left active:scale-[0.98] ${
                       isSelected
-                        ? `${pedas.activeStyle} shadow-sm font-black`
-                        : 'bg-slate-50/70 border-slate-200 text-slate-600 hover:bg-white hover:border-slate-300'
+                        ? `${saus.activeStyle} shadow-sm`
+                        : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 shadow-sm shadow-slate-100/50'
                     }`}
                   >
-                    <div className="flex items-center gap-1.5">
-                      {pedas.indicator}
-                      <span 
-                        className="text-xs font-black uppercase tracking-tight"
-                        style={{ fontFamily: 'var(--font-montserrat), sans-serif' }}
-                      >
-                        {pedas.label}
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex items-center justify-center w-6 h-6">
+                        {saus.icon}
+                      </div>
+                      <span className={`font-serif text-[13px] ${isSelected ? 'font-black' : 'font-bold'}`}>
+                        {saus.label}
                       </span>
                     </div>
-
-                    <span className="text-[9px] font-bold text-slate-500">{pedas.desc}</span>
+                    {isSelected && (
+                      <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 shadow-inner ${saus.checkStyle}`}>
+                        <Check className="w-2.5 h-2.5 text-white stroke-[3.5]" />
+                      </div>
+                    )}
                   </button>
                 );
               })}
             </div>
           </div>
 
-          {/* SECTION 3: CATATAN KHUSUS */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 block">Catatan Khusus (Opsional):</label>
+          {/* Section 4: Catatan */}
+          <div className="space-y-2 pt-2">
+            <label className="text-xs font-bold text-slate-700 block px-1 font-serif">Catatan Khusus (Opsional):</label>
             <textarea
               value={catatan}
               onChange={(e) => setCatatan(e.target.value)}
-              placeholder="Contoh: Bumbunya dipisah ya bang / goreng agak garing..."
+              placeholder="Contoh: Sausnya dipisah ya bang..."
               rows={2}
-              className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/10 transition-all resize-none"
+              className="w-full bg-white border border-slate-200 rounded-3xl p-4 text-xs font-serif text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/10 transition-all resize-none shadow-sm"
             />
           </div>
-
         </div>
 
-        {/* STICKY BOTTOM ACTION BAR */}
-        <div className="p-4 bg-white border-t border-slate-100 flex items-center justify-between gap-3 shrink-0 shadow-lg">
-          
-          {/* Counter Quantity Porsi */}
-          <div className="flex items-center gap-2.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200 shrink-0">
+        {/* Bottom Action Bar */}
+        <div className="p-4 bg-white flex items-center justify-between gap-3 shrink-0 rounded-b-[2rem] z-10 relative border-t border-slate-100">
+          <div className="flex items-center gap-3 bg-slate-50 p-1.5 rounded-full border border-slate-100 shrink-0">
             <button
               onClick={() => setQuantity((prev) => Math.max(1, prev - 1))}
-              className="w-8 h-8 rounded-xl bg-white hover:bg-slate-200/80 flex items-center justify-center text-slate-800 disabled:opacity-40 transition-colors shadow-sm"
+              className="w-10 h-10 rounded-full bg-white hover:bg-slate-100 flex items-center justify-center text-slate-600 disabled:opacity-40 transition-colors shadow-sm"
               disabled={quantity <= 1}
             >
-              <Minus className="w-3.5 h-3.5 stroke-[2.5]" />
+              <Minus className="w-4 h-4 stroke-[2.5]" />
             </button>
-            <span 
-              className="font-black text-sm text-slate-900 w-6 text-center"
-              style={{ fontFamily: 'var(--font-montserrat), sans-serif' }}
-            >
+            <span className="font-black text-sm text-slate-900 w-4 text-center" style={{ fontFamily: "'Montserrat', sans-serif" }}>
               {quantity}
             </span>
             <button
               onClick={() => setQuantity((prev) => prev + 1)}
-              className="w-8 h-8 rounded-xl bg-red-600 hover:bg-red-700 flex items-center justify-center text-white transition-colors shadow-sm"
+              className="w-10 h-10 rounded-full bg-red-600 hover:bg-red-700 flex items-center justify-center text-white transition-colors shadow-sm shadow-red-500/30"
             >
-              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+              <Plus className="w-4 h-4 stroke-[2.5]" />
             </button>
           </div>
 
-          {/* Tombol Tambah ke Keranjang */}
           <button
             onClick={handleAdd}
-            className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 px-4 rounded-2xl text-xs font-black tracking-wide uppercase flex items-center justify-between transition-all active:scale-[0.98] shadow-md shadow-red-600/20"
-            style={{ fontFamily: 'var(--font-montserrat), sans-serif' }}
+            className="flex-1 bg-red-600 hover:bg-red-700 text-white py-4 px-5 rounded-full text-xs font-black tracking-widest uppercase flex items-center justify-between transition-all active:scale-[0.98] shadow-lg shadow-red-600/25"
+            style={{ fontFamily: "'Montserrat', sans-serif" }}
           >
-            <span>TAMBAH KE KERANJANG</span>
-            <span className="bg-white/20 px-2 py-0.5 rounded-lg text-white font-black backdrop-blur-sm">
+            <span>{product.editingIndex !== undefined ? 'SIMPAN PERUBAHAN' : 'TAMBAH KE KERANJANG'}</span>
+            <span className="bg-white/20 px-2.5 py-1 rounded-full text-white font-black backdrop-blur-sm">
               Rp {totalPrice.toLocaleString('id-ID')}
             </span>
           </button>
-
         </div>
 
       </div>

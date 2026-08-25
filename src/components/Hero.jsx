@@ -74,7 +74,7 @@ export default function Hero({ onOrderClick }) {
                 className="group relative w-full sm:w-max px-8 py-4 bg-red-600 text-white font-black text-xs sm:text-sm uppercase tracking-widest rounded-full breathing-glow hover:-translate-y-1 transition-all duration-300 ease-out flex items-center justify-center gap-3 cursor-pointer"
               >
                 <ShoppingCart className="w-5 h-5 text-amber-300 animate-bounce shrink-0" />
-                <span className="relative z-10">Lihat Menu & Racik</span>
+                <span className="relative z-10">Pesan Sekarang</span>
               </button>
             </div>
 
@@ -126,7 +126,7 @@ export default function Hero({ onOrderClick }) {
 
           {/* ================= KOLOM KANAN (FOTO DUMMY & MATAHARI) ================= */}
           {/* Ditambahkan mt-12 mb-6 di mobile biar posisinya turun ke bawah dan punya jarak aman */}
-          <div className="w-full lg:col-span-5 order-2 lg:order-2 relative mt-20 mb-6 lg:mt-0 lg:mb-0 flex justify-center lg:px-4">
+          <div className="w-full lg:col-span-5 order-2 lg:order-2 relative mt-25 mb-6 lg:mt-0 lg:mb-0 flex justify-center lg:px-4">
             
             <div className="relative w-full max-w-[320px] sm:max-w-[400px] aspect-[4/5] sm:aspect-square group">
               
