@@ -3,7 +3,8 @@
 import React, { useState } from 'react';
 import { 
   X, Trash2, Plus, Minus, ShoppingBag, 
-  MapPin, Send, AlertCircle, User, MessageSquare, Pencil, Sparkles, Flame, Leaf 
+  MapPin, AlertCircle, User, MessageSquare, Pencil, Sparkles, Flame, Leaf,
+  QrCode, Banknote // Tambahan icon baru
 } from 'lucide-react';
 
 export default function Cart({ 
@@ -13,7 +14,9 @@ export default function Cart({
   onUpdateQuantity = () => {}, 
   onRemoveItem = () => {}, 
   onEditItem = () => {},
-  onClearCart = () => {}
+  onClearCart = () => {},
+  onCheckoutCash = () => {},
+  onCheckoutQris = () => {}
 }) {
   if (!isOpen) return null;
 
@@ -51,15 +54,9 @@ export default function Cart({
     return map[id] || id;
   };
 
-  const handleCheckoutWA = () => {
-    if (!nama.trim()) {
-      setErrorNama(true);
-      return;
-    }
-    setErrorNama(false);
-
+  // FUNGSI RAKIT PESAN WA (Bisa buat QRIS atau Tunai)
+  const generateWAUrl = (isQris) => {
     const targetPhone = '628567637987';
-
     let message = `🐙 *PESANAN TAKOYAKI SIBOY (SELF-PICKUP)* 🐙\n`;
     message += `------------------------------------------\n`;
     message += `👤 *Nama Pemesan:* ${nama.trim()}\n`;
@@ -90,18 +87,28 @@ export default function Cart({
 
     message += `------------------------------------------\n`;
     message += `💰 *TOTAL BAYAR:* Rp ${subtotal.toLocaleString('id-ID')}\n`;
-    message += `💳 *Pembayaran:* Tunai / QRIS di Gerobak\n\n`;
-    message += `_Mohon diproses ya bang, saya langsung ambil ke gerobak!_ 🚀`;
+    
+    if (isQris) {
+      message += `💳 *Pembayaran:* QRIS (Bukti transfer dilampirkan)\n\n`;
+    } else {
+      message += `💳 *Pembayaran:* Tunai / Bayar di Gerobak\n\n`;
+    }
+    
+    message += `_Mohon diproses ya bang, saya langsung ambil ke kedai!_ 🚀`;
 
-    const encodedMessage = encodeURIComponent(message);
-    const waUrl = `https://wa.me/${targetPhone}?text=${encodedMessage}`;
+    return `https://wa.me/${targetPhone}?text=${encodeURIComponent(message)}`;
+  };
 
-    onClearCart();
-    setNama('');
-    setCatatanGlobal('');
-    onClose();
+  const handleCashClick = () => {
+    if (!nama.trim()) { setErrorNama(true); return; }
+    setErrorNama(false);
+    onCheckoutCash(generateWAUrl(false));
+  };
 
-    window.open(waUrl, '_blank');
+  const handleQrisClick = () => {
+    if (!nama.trim()) { setErrorNama(true); return; }
+    setErrorNama(false);
+    onCheckoutQris(generateWAUrl(true));
   };
 
   return (
@@ -140,7 +147,6 @@ export default function Cart({
           <button
             onClick={onClose}
             className="group w-8 h-8 rounded-full bg-slate-100 hover:bg-red-600 text-slate-500 hover:text-white flex items-center justify-center transition-all duration-200 shrink-0 active:scale-90 shadow-sm border border-slate-200/80 hover:border-red-600"
-            title="Tutup Keranjang"
           >
             <X className="w-4 h-4 group-hover:rotate-90 transition-transform duration-300 stroke-[2.5]" />
           </button>
@@ -207,7 +213,6 @@ export default function Cart({
                         onClick={() => onEditItem(index)}
                         className="flex items-center gap-1 text-[10px] font-black text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 px-2.5 py-1 rounded-lg transition-all active:scale-95 group/edit"
                         title="Edit Pilihan Topping & Saus"
-                        style={{ fontFamily: "'Montserrat', sans-serif" }}
                       >
                         <Pencil className="w-3 h-3 text-amber-600 group-hover/edit:rotate-12 transition-transform" />
                         <span>EDIT</span>
@@ -223,7 +228,6 @@ export default function Cart({
                     </div>
                   </div>
 
-                  {/* BADGE RACIKAN TAKOYAKI */}
                   <div className="flex flex-wrap gap-1.5 text-[10px] font-bold">
                     <span className="bg-amber-50 text-amber-900 px-2.5 py-1 rounded-lg border border-amber-200/80 flex items-center gap-1">
                       <Sparkles className="w-3 h-3 text-amber-500" />
@@ -253,14 +257,12 @@ export default function Cart({
                     </span>
                   </div>
 
-                  {/* CATATAN MENU */}
                   {item.catatan && (
                     <p className="text-[11px] text-slate-600 italic bg-slate-50 p-2 rounded-xl border border-slate-100 font-serif">
                       "{item.catatan}"
                     </p>
                   )}
 
-                  {/* COUNTER QTY */}
                   <div className="flex items-center justify-between pt-2 border-t border-slate-100">
                     <span className="text-[11px] font-bold text-slate-400">Porsi:</span>
                     <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-xl border border-slate-200 shadow-inner">
@@ -291,7 +293,6 @@ export default function Cart({
 
           {cartItems.length > 0 && (
             <div className="pt-2 space-y-3">
-              {/* NAMA PEMESAN */}
               <div className="border-t border-slate-100 pt-3">
                 <label 
                   className="text-xs font-black text-slate-800 uppercase tracking-wide flex items-center gap-1.5 mb-1"
@@ -320,7 +321,6 @@ export default function Cart({
                 )}
               </div>
 
-              {/* CATATAN GLOBAL */}
               <div>
                 <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5 mb-1">
                   <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
@@ -338,9 +338,9 @@ export default function Cart({
           )}
         </div>
 
-        {/* FOOTER CHECKOUT */}
+        {/* FOOTER CHECKOUT (2 TOMBOL BARU) */}
         {cartItems.length > 0 && (
-          <div className="p-4 bg-white border-t border-slate-100 space-y-3 shrink-0 shadow-lg">
+          <div className="p-4 bg-white border-t border-slate-100 space-y-3 shrink-0 shadow-[0_-10px_20px_rgba(0,0,0,0.03)]">
             <div className="flex items-center justify-between text-xs font-bold text-slate-500">
               <span>Total Pembayaran:</span>
               <span 
@@ -351,14 +351,25 @@ export default function Cart({
               </span>
             </div>
 
-            <button
-              onClick={handleCheckoutWA}
-              className="group w-full bg-emerald-500 hover:bg-emerald-600 active:scale-[0.98] text-slate-950 py-3.5 px-4 rounded-2xl text-xs font-black tracking-wide uppercase flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20"
-              style={{ fontFamily: "'Montserrat', sans-serif" }}
-            >
-              <Send className="w-4 h-4 fill-slate-950 group-hover:translate-x-1 group-hover:-translate-y-0.5 transition-transform duration-300" />
-              <span>KIRIM PESANAN VIA WA</span>
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={handleCashClick}
+                className="w-full bg-emerald-50 hover:bg-emerald-500 text-emerald-700 hover:text-white border border-emerald-200 hover:border-emerald-500 py-3.5 px-2 rounded-xl text-[10px] sm:text-[11px] font-black tracking-wide uppercase flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-sm"
+                style={{ fontFamily: "'Montserrat', sans-serif" }}
+              >
+                <Banknote className="w-4 h-4 shrink-0" />
+                <span>BAYAR TUNAI</span>
+              </button>
+
+              <button
+                onClick={handleQrisClick}
+                className="w-full bg-sky-500 hover:bg-sky-600 border border-sky-500 text-white py-3.5 px-2 rounded-xl text-[10px] sm:text-[11px] font-black tracking-wide uppercase flex items-center justify-center gap-1.5 transition-all shadow-md shadow-sky-500/20 active:scale-95"
+                style={{ fontFamily: "'Montserrat', sans-serif" }}
+              >
+                <QrCode className="w-4 h-4 shrink-0" />
+                <span>BAYAR VIA QRIS</span>
+              </button>
+            </div>
           </div>
         )}
       </div>

@@ -7,6 +7,7 @@ import Menu from '@/components/Menu';
 import Footer from '@/components/Footer';
 import RacikModal from '@/components/RacikModal';
 import Cart from '@/components/Cart';
+import Qris from '@/components/Qris'; 
 
 export default function Home() {
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -14,29 +15,28 @@ export default function Home() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [cartItems, setCartItems] = useState([]);
   const [editingIndex, setEditingIndex] = useState(null);
+  
+  // STATE QRIS DAN PENYIMPANAN LINK WA
+  const [isQrisOpen, setIsQrisOpen] = useState(false);
+  const [waUrl, setWaUrl] = useState('');
 
   const cartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
+  const cartTotal = cartItems.reduce((acc, item) => acc + (item.totalPrice || 0), 0);
 
-  // 1. HANDLER BUKA RACIK MODAL DARI MENU
   const handleSelectPackage = (selectedItem) => {
-    console.log("👉 1. MENU DIKLIK! Data diterima:", selectedItem);
     setEditingIndex(null);
     setSelectedProduct(selectedItem);
     setIsModalOpen(true);
   };
 
-  // 2. HANDLER EDIT ITEM DARI KERANJANG
   const handleEditItem = (index) => {
-    console.log("👉 EDIT ITEM INDEX:", index);
     setEditingIndex(index);
     setSelectedProduct(cartItems[index]);
     setIsCartOpen(false);
     setIsModalOpen(true);
   };
 
-  // 3. TAMBAH / SIMPAN PERUBAHAN KE KERANJANG
   const handleAddToCart = (orderData) => {
-    console.log("👉 MASUK KERANJANG:", orderData);
     if (editingIndex !== null) {
       setCartItems((prev) => {
         const updated = [...prev];
@@ -47,11 +47,11 @@ export default function Home() {
       setIsCartOpen(true);
     } else {
       setCartItems((prev) => [...prev, orderData]);
+      setIsCartOpen(true);
     }
     setIsModalOpen(false);
   };
 
-  // 4. UPDATE QUANTITY PORSI (+ / -)
   const handleUpdateQuantity = (index, newQty) => {
     if (newQty < 1) return;
     setCartItems((prev) => {
@@ -62,14 +62,11 @@ export default function Home() {
     });
   };
 
-  // 5. HAPUS ITEM DARI KERANJANG
   const handleRemoveItem = (index) => {
     setCartItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // 6. KOSONGKAN KERANJANG TOTAL (CHECKOUT WA)
   const handleClearCart = () => {
-    console.log("👉 KERANJANG DIBERSIHKAN!");
     setCartItems([]);
   };
 
@@ -97,9 +94,9 @@ export default function Home() {
         <Footer />
       </div>
 
-      {/* POP-UP RACIK BUMBU */}
       {isModalOpen && selectedProduct && (
         <RacikModal 
+          key={editingIndex !== null ? `edit-${editingIndex}` : `new-${selectedProduct.id || Date.now()}`}
           product={selectedProduct} 
           isEditMode={editingIndex !== null}
           onClose={() => {
@@ -110,7 +107,20 @@ export default function Home() {
         />
       )}
 
-      {/* DRAWER KERANJANG BELANJA */}
+      {/* MODAL QRIS */}
+      <Qris 
+        isOpen={isQrisOpen}
+        onClose={() => setIsQrisOpen(false)}
+        totalPrice={cartTotal}
+        onProceedWA={() => {
+          if (waUrl) window.open(waUrl, '_blank');
+          handleClearCart();
+          setIsCartOpen(false);
+          setIsQrisOpen(false);
+        }} 
+      />
+
+      {/* KERANJANG */}
       <Cart 
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
@@ -119,6 +129,17 @@ export default function Home() {
         onRemoveItem={handleRemoveItem}
         onEditItem={handleEditItem}
         onClearCart={handleClearCart}
+        
+        // PROPS BARU UNTUK 2 TOMBOL CHECKOUT
+        onCheckoutCash={(url) => {
+          window.open(url, '_blank');
+          handleClearCart();
+          setIsCartOpen(false);
+        }}
+        onCheckoutQris={(url) => {
+          setWaUrl(url); // Simpan link WA yang bawa data nama
+          setIsQrisOpen(true); // Buka popup QRIS
+        }}
       />
     </main>
   );
