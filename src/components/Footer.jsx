@@ -1,9 +1,31 @@
 'use client';
 
-import React from 'react';
+import React, { useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { Clock, Sparkles, Flame, Store, MessageCircle, ExternalLink } from 'lucide-react';
 
 export default function Footer() {
+  const router = useRouter();
+  const holdTimerRef = useRef(null);
+
+  // Navigasi ke login admin
+  const goToAdmin = () => {
+    router.push('/admin/login');
+  };
+
+  // Logika tahan 2 detik (mouse & layar sentuh HP)
+  const handleHoldStart = () => {
+    holdTimerRef.current = setTimeout(() => {
+      goToAdmin();
+    }, 2000);
+  };
+
+  const handleHoldEnd = () => {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+    }
+  };
+
   // Koordinat Lokasi Kedai Takoyaki Siboy
   const latitude = -6.235254;
   const longitude = 106.883730;
@@ -109,7 +131,7 @@ export default function Footer() {
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 rounded-full bg-slate-900 border border-slate-700 p-1 flex items-center justify-center shrink-0 shadow-lg overflow-hidden">
                   <img 
-                    src="/logo.jpg"
+                    src="/logo.jpg" 
                     alt="Logo Takoyaki Siboy" 
                     className="w-full h-full object-cover rounded-full"
                   />
@@ -122,7 +144,7 @@ export default function Footer() {
                 </h3>
               </div>
 
-              {/* 4 BADGES KEUNGGULAN: OUTLINE GLOW (Elegan & Modern) */}
+              {/* 4 BADGES KEUNGGULAN */}
               <div className="flex flex-wrap items-center gap-2.5">
                 <span 
                   className="inline-flex items-center gap-1.5 text-[10px] sm:text-[11px] font-black uppercase tracking-widest bg-amber-500/10 border border-amber-500/40 text-amber-400 px-3 py-1.5 rounded-full hover:bg-amber-500/20 hover:shadow-[0_0_12px_rgba(251,191,36,0.3)] transition-all duration-300 cursor-default"
@@ -173,10 +195,8 @@ export default function Footer() {
               </ul>
             </div>
 
-            {/* ACTION CARDS: AUTO WIDTH & SOLID VIBRANT */}
+            {/* ACTION CARDS */}
             <div className="flex flex-wrap items-center gap-3 pt-2">
-              
-              {/* Card 1: Jam Operasional (Kuning Solid) */}
               <div 
                 className="inline-flex items-center justify-center gap-2 bg-amber-400 border border-amber-400 text-slate-950 px-5 py-3 rounded-xl text-xs font-black tracking-wide uppercase shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_4px_20px_rgba(251,191,36,0.25)] cursor-default"
                 style={{ fontFamily: "'Montserrat', sans-serif" }}
@@ -185,7 +205,6 @@ export default function Footer() {
                 <span>16.00 - 22.00 WIB</span>
               </div>
 
-              {/* Card 2: WA Button (Hijau Solid) */}
               <a
                 href={waUrl}
                 target="_blank"
@@ -199,7 +218,6 @@ export default function Footer() {
                 <span>PESAN WA</span>
               </a>
 
-              {/* Card 3: IG Button (Pink Magenta Solid) */}
               <a
                 href={igUrl}
                 target="_blank"
@@ -233,7 +251,23 @@ export default function Footer() {
 
         {/* BOTTOM CREDIT */}
         <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-medium text-slate-500">
-          <p>© {new Date().getFullYear()} Takoyaki Siboy. All rights reserved.</p>
+          
+          {/* PINTU RAHASIA: Klik 3x cepat ATAU tahan 2 detik */}
+          <p 
+            onClick={(e) => {
+              if (e.detail >= 3) {
+                goToAdmin();
+              }
+            }}
+            onMouseDown={handleHoldStart}
+            onMouseUp={handleHoldEnd}
+            onTouchStart={handleHoldStart}
+            onTouchEnd={handleHoldEnd}
+            className="cursor-default select-none transition-colors hover:text-slate-400"
+            title="Takoyaki Siboy"
+          >
+            © {new Date().getFullYear()} Takoyaki Siboy. All rights reserved.
+          </p>
 
           <a
             href="https://instagram.com/rwapaaa77"

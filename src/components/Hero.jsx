@@ -28,13 +28,11 @@ export default function Hero({ onOrderClick }) {
 
       <section id="beranda" className="bg-[#faf9f6] text-slate-900 pt-24 pb-16 lg:pt-24 lg:pb-16 min-h-[100dvh] flex flex-col justify-center relative overflow-hidden" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
 
-        {/* BACKGROUND GRID */}
         <div className="absolute inset-0 z-0 pointer-events-none" style={{
           backgroundSize: '32px 32px',
           backgroundImage: 'linear-gradient(to right, rgba(0, 0, 0, 0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(0, 0, 0, 0.04) 1px, transparent 1px)'
         }} />
 
-        {/* 4 WATERMARK KANJI */}
         <div className="absolute top-12 left-4 lg:left-12 text-red-600/15 font-black text-6xl lg:text-7xl pointer-events-none select-none z-0" style={{ writingMode: 'vertical-rl', textOrientation: 'upright' }}>
           一番
         </div>
@@ -50,7 +48,6 @@ export default function Hero({ onOrderClick }) {
 
         <div className="max-w-6xl mx-auto px-4 sm:px-6 w-full flex flex-col lg:grid lg:grid-cols-12 gap-8 lg:gap-6 items-center z-10 relative">
 
-          {/* ================= KOLOM KIRI (TEKS & FITUR) ================= */}
           <div className="w-full lg:col-span-7 flex flex-col justify-center order-1 text-center lg:text-left">
             
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -67,7 +64,6 @@ export default function Hero({ onOrderClick }) {
               </h1>
             </div>
 
-            {/* Tombol Utama */}
             <div className="pt-8 sm:pt-10 lg:pt-12 w-full animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
               <button
                 onClick={onOrderClick}
@@ -78,7 +74,6 @@ export default function Hero({ onOrderClick }) {
               </button>
             </div>
 
-            {/* 4 CARD KEUNGGULAN */}
             <div className="mt-10 lg:mt-12 w-full grid grid-cols-2 gap-3 sm:gap-4 max-w-xl mx-auto lg:mx-0">
               
               <div className="group bg-white p-3.5 sm:p-4 rounded-2xl border-2 border-slate-100 shadow-sm hover:shadow-lg hover:shadow-red-500/20 hover:border-red-400 flex items-center gap-3 sm:gap-4 transition-all duration-200 ease-in-out cursor-default hover:-translate-y-1 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-300 fill-mode-both">
@@ -124,8 +119,6 @@ export default function Hero({ onOrderClick }) {
             </div>
           </div>
 
-          {/* ================= KOLOM KANAN (FOTO DUMMY & MATAHARI) ================= */}
-          {/* Ditambahkan mt-12 mb-6 di mobile biar posisinya turun ke bawah dan punya jarak aman */}
           <div className="w-full lg:col-span-5 order-2 lg:order-2 relative mt-25 mb-6 lg:mt-0 lg:mb-0 flex justify-center lg:px-4">
             
             <div className="relative w-full max-w-[320px] sm:max-w-[400px] aspect-[4/5] sm:aspect-square group">
@@ -147,13 +140,14 @@ export default function Hero({ onOrderClick }) {
                 />
               </div>
 
+              {/* Status Operasional Dinamis Menggantikan Best Seller */}
               <div className="absolute -top-3 -left-3 sm:-top-4 sm:-left-6 z-20 animate-in fade-in slide-in-from-top-4 duration-700 delay-700 fill-mode-both">
                 <div className="bg-white/95 backdrop-blur-sm border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.08)] rounded-full px-4 py-2 sm:py-2.5 flex items-center gap-2.5">
                   <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-600"></span>
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                   </span>
-                  <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-slate-900 leading-none mt-0.5">Best Seller</span>
+                  <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-slate-900 leading-none mt-0.5">Buka | 16.00 - 22.00</span>
                 </div>
               </div>
 
