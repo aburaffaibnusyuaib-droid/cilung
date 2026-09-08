@@ -4,7 +4,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { 
   CheckCircle2, Clock, Flame, Receipt, 
-  ChevronRight, Store, Sparkles, AlertCircle
+  ChevronRight, Store, Sparkles
 } from 'lucide-react';
 
 /* ================= VECTOR INSTAGRAM ICON ================= */
@@ -60,7 +60,8 @@ function TicketContent() {
         setCurrentOrder({
           ...matchedHistory,
           status: liveStatus,
-          queueNumber: liveQueue
+          queueNumber: liveQueue,
+          customerName: matchedHistory.name || 'PELANGGAN'
         });
       } catch (e) {}
     };
@@ -77,9 +78,9 @@ function TicketContent() {
       title: 'Antrean Masuk', desc: 'Menunggu koki meracik'
     },
     cooking: {
-      bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-800', 
-      iconBg: 'bg-blue-500', icon: <Flame className="w-5 h-5 text-white animate-bounce" />,
-      title: 'Sedang Dimasak', desc: 'Takoyaki sedang di wajan'
+      bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-800', 
+      iconBg: 'bg-red-600', icon: <Flame className="w-5 h-5 text-white animate-bounce" />,
+      title: 'Sedang Dimasak', desc: 'Takoyaki di wajan'
     },
     ready: {
       bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-800', 
@@ -97,7 +98,7 @@ function TicketContent() {
           <Store className="w-12 h-12 text-slate-300 mx-auto mb-3" />
           <h2 className="text-lg font-black text-slate-800 uppercase">Pesanan Tidak Ditemukan</h2>
           <p className="text-xs text-slate-400 mt-1">
-            {targetId ? `Transaksi dengan kode "${targetId}" tidak ditemukan.` : 'Belum ada transaksi di kasir.'}
+            {targetId ? `Transaksi dengan kode "${targetId}" tidak ditemukan.` : 'Belum ada transaksi aktif di kasir.'}
           </p>
         </div>
       </div>
@@ -126,19 +127,30 @@ function TicketContent() {
 
         <div className="flex-1 flex flex-col p-4 sm:px-6 pt-2 relative z-10 overflow-hidden">
           
-          {/* 1. KARTU ANTREAN & STATUS DINAMIS */}
-          <div className={`rounded-2xl p-4 border-2 transition-all duration-500 flex items-center justify-between mb-4 shrink-0 shadow-sm ${activeTheme.bg} ${activeTheme.border}`}>
-            <div>
+          {/* 1. KARTU ANTREAN & STATUS DINAMIS + NAMA PEMBELI */}
+          <div className={`rounded-2xl p-4 sm:p-5 border-2 transition-all duration-500 flex items-center justify-between mb-4 shrink-0 shadow-sm ${activeTheme.bg} ${activeTheme.border}`}>
+            <div className="min-w-0 pr-3">
               <p className="text-[9px] font-black uppercase tracking-widest opacity-60 mb-0.5">No. Antrean</p>
-              <h2 className={`text-4xl font-black tracking-tighter leading-none ${activeTheme.text}`}>{currentOrder.queueNumber}</h2>
-            </div>
-            <div className="flex items-center gap-3 text-right">
-              <div>
-                <h3 className={`text-xs font-black uppercase tracking-wider ${activeTheme.text}`}>{activeTheme.title}</h3>
-                <p className={`text-[10px] font-bold opacity-70 ${activeTheme.text}`}>{activeTheme.desc}</p>
+              <h2 className={`text-4xl sm:text-5xl font-black tracking-tighter leading-none ${activeTheme.text}`}>{currentOrder.queueNumber}</h2>
+              
+              {/* Nama Pembeli (A/N) dengan Truncate responsif */}
+              <div className="mt-2 flex items-center gap-1.5">
+                <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded border opacity-80 ${activeTheme.border} ${activeTheme.text}`}>
+                  A/N
+                </span>
+                <span className={`text-xs sm:text-sm font-black uppercase truncate max-w-[110px] sm:max-w-[150px] ${activeTheme.text}`}>
+                  {currentOrder.customerName}
+                </span>
               </div>
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-inner shrink-0 ${activeTheme.iconBg}`}>
+            </div>
+
+            <div className="flex flex-col items-end gap-2 text-right shrink-0">
+              <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center shadow-inner ${activeTheme.iconBg}`}>
                 {activeTheme.icon}
+              </div>
+              <div>
+                <h3 className={`text-[11px] sm:text-xs font-black uppercase tracking-wider ${activeTheme.text}`}>{activeTheme.title}</h3>
+                <p className={`text-[9px] sm:text-[10px] font-bold opacity-70 mt-0.5 ${activeTheme.text}`}>{activeTheme.desc}</p>
               </div>
             </div>
           </div>

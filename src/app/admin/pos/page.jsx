@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { QRCodeSVG } from 'qrcode.react'; // LIBRARY QR CODE DINAMIS
 import { 
   Search, X, Plus, Minus, Check, Ban, Leaf, Flame, Store, 
-  ShoppingCart, Trash2, CheckCircle2, Printer, QrCode,
+  ShoppingCart, Trash2, CheckCircle2, Printer,
   Banknote, ScanLine, Menu
 } from 'lucide-react';
 
@@ -288,6 +289,9 @@ export default function POSPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
+  // State untuk Base URL (IP Address/Localhost) agar QR Code bekerja
+  const [baseUrl, setBaseUrl] = useState('');
+
   // State Harga Paten & Stok Topping Terhubung ke Dashboard
   const [prices, setPrices] = useState({ kecil: 6000, besar: 12000, special: 17000 });
   const [toppingsStock, setToppingsStock] = useState([]);
@@ -324,6 +328,8 @@ export default function POSPage() {
   // Sinkronisasi data harga dan topping dari localStorage
   useEffect(() => {
     setIsMounted(true);
+    setBaseUrl(window.location.origin); // Set Base URL secara dinamis sesuai jaringan
+    
     const auth = localStorage.getItem('admin_auth');
     if (!auth) router.push('/admin/login');
 
@@ -667,7 +673,7 @@ export default function POSPage() {
                 onClick={() => initPayment('qris')} 
                 className="flex items-center justify-center gap-2 bg-sky-500 hover:bg-sky-600 text-white border-2 border-sky-500 hover:border-sky-600 shadow-lg shadow-sky-500/25 text-xs font-black uppercase tracking-widest py-3.5 rounded-2xl transition-all active:scale-[0.98] cursor-pointer"
               >
-                <QrCode className="w-4 h-4" /> Via QRIS
+                <ScanLine className="w-4 h-4" /> Via QRIS
               </button>
             </div>
           </div>
@@ -729,31 +735,34 @@ export default function POSPage() {
         </div>
       )}
 
-      {/* MODAL BAYAR QRIS */}
+      {/* MODAL BAYAR QRIS (DANA ASLI) */}
       {paymentMode === 'qris' && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white rounded-[2rem] w-full max-w-sm overflow-hidden relative shadow-2xl p-7 animate-in zoom-in-95 flex flex-col items-center text-center">
             <button onClick={() => setPaymentMode(null)} className="absolute top-5 right-5 w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 cursor-pointer"><X className="w-4 h-4" /></button>
             
-            <div className="bg-sky-100 text-sky-600 rounded-2xl px-4 py-1.5 mb-5 flex items-center gap-2">
-              <ScanLine className="w-4 h-4" /> <span className="text-[10px] font-black uppercase tracking-widest">Pembayaran QRIS</span>
+            <div className="bg-sky-100 text-sky-600 rounded-2xl px-4 py-1.5 mb-4 flex items-center gap-2">
+              <ScanLine className="w-4 h-4" /> <span className="text-[10px] font-black uppercase tracking-widest">Pembayaran QRIS All Payment</span>
             </div>
 
             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Total Tagihan</p>
-            <p className="text-3xl font-black text-sky-600 mb-6">Rp {totalAkhir.toLocaleString('id-ID')}</p>
+            <p className="text-3xl font-black text-sky-600 mb-4">Rp {totalAkhir.toLocaleString('id-ID')}</p>
 
-            <div className="bg-white p-2 border-4 border-dashed border-slate-200 rounded-[2rem] mb-6 shadow-inner">
-              <QrCode className="w-48 h-48 text-slate-800" />
+            {/* Gambar Asli QRIS DANA Lu */}
+            <div className="bg-white p-2 border-4 border-dashed border-slate-200 rounded-[2rem] mb-4 shadow-inner relative w-56 h-56 overflow-hidden">
+              <img src="/qrasli.jpg" alt="QRIS DANA" className="w-full h-full object-contain" />
             </div>
 
-            <p className="text-xs font-bold text-slate-500 mb-6">Minta pelanggan memindai QR di atas menggunakan aplikasi e-Wallet atau M-Banking.</p>
+            <p className="text-[10px] font-bold text-slate-500 mb-6 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+              Pastikan pelanggan mentransfer sesuai nominal. <strong className="text-slate-800">Cek mutasi atau layar HP pelanggan</strong> sebelum klik verifikasi lunas.
+            </p>
 
             <button onClick={processPayment} className="w-full bg-sky-500 hover:bg-sky-600 text-white py-4 rounded-2xl text-xs font-black tracking-widest uppercase shadow-lg shadow-sky-500/30 active:scale-95 transition-all cursor-pointer">Verifikasi Lunas</button>
           </div>
         </div>
       )}
 
-      {/* MODAL SUKSES (Cetak Struk & Scan Karcis Unik) */}
+      {/* MODAL SUKSES (Cetak Struk & Scan Karcis Tracker) */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white rounded-[2.5rem] w-full max-w-sm overflow-hidden relative shadow-2xl p-6 sm:p-7 flex flex-col items-center text-center animate-in zoom-in-90 duration-300">
@@ -768,11 +777,11 @@ export default function POSPage() {
             <h2 className="text-base font-black uppercase tracking-tight text-slate-800 mb-0.5" style={{ fontFamily: "'Montserrat', sans-serif" }}>Transaksi Berhasil!</h2>
             <p className="text-[11px] font-bold text-slate-500 mb-4">Atas Nama: <span className="text-slate-800 uppercase font-black">{customerName}</span> ({orderType})</p>
 
-            {/* QR Code Dinamis Khusus Pesanan Ini */}
+            {/* QR Code Tracker Dinamis (Asli & Bisa di Scan) */}
             <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-3.5 mb-4 flex flex-col items-center w-full">
               <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">Scan Karcis Pelanggan (Live Tracker)</p>
               <div className="bg-white p-2 rounded-xl shadow-sm border border-slate-200 mb-2">
-                <QrCode className="w-28 h-28 text-slate-800" />
+                <QRCodeSVG value={`${baseUrl}/ticket?id=${lastOrderId}`} size={112} level={"H"} />
               </div>
               <button 
                 type="button"
