@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { X, Plus, Minus, Check, Ban, Leaf, Flame } from 'lucide-react';
+import { X, Plus, Minus, Check, Ban, Leaf, Flame, Store } from 'lucide-react';
 
 /* ================= VECTOR FOOD ICONS ================= */
 const SausageHorizontalIcon = ({ className = 'w-4 h-4' }) => (
@@ -68,7 +68,7 @@ const MayoSwirlIcon = ({ className = 'w-4 h-4' }) => (
 );
 
 /* ================= COMPONENT ================= */
-export default function MenuModal({ product, onClose, onAddToCart }) {
+export default function MenuModal({ product, onClose, onAddToCart, isOpenStore = true }) {
   if (!product) return null;
 
   const [quantity, setQuantity] = useState(product.quantity || 1);
@@ -201,6 +201,8 @@ export default function MenuModal({ product, onClose, onAddToCart }) {
   };
 
   const handleAdd = () => {
+    if (!isOpenStore) return;
+
     const orderData = {
       ...product,
       quantity,
@@ -248,12 +250,20 @@ export default function MenuModal({ product, onClose, onAddToCart }) {
 
           <button
             onClick={onClose}
-            className="group w-9 h-9 rounded-full bg-slate-100 hover:bg-red-600 text-slate-500 hover:text-white flex items-center justify-center transition-all duration-200 shrink-0 active:scale-90 hover:scale-105 shadow-sm"
+            className="group w-9 h-9 rounded-full bg-slate-100 hover:bg-red-600 text-slate-500 hover:text-white flex items-center justify-center transition-all duration-200 shrink-0 active:scale-90 hover:scale-105 shadow-sm cursor-pointer"
             aria-label="Tutup"
           >
             <X className="w-4 h-4 group-hover:rotate-90 transition-transform duration-300 stroke-[2.5]" />
           </button>
         </div>
+
+        {/* Banner Jika Toko Sedang Tutup */}
+        {!isOpenStore && (
+          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center gap-2 text-amber-800 text-[11px] font-bold">
+            <Store className="w-4 h-4 shrink-0 text-amber-600" />
+            <span>Toko sedang tutup. Kamu tetap bisa melihat varian racikan, tetapi pesanan tidak dapat ditambahkan.</span>
+          </div>
+        )}
 
         {/* Body Content */}
         <div className="p-4 sm:p-6 overflow-y-auto space-y-7 scrollbar-hide bg-[#fcfcfc]">
@@ -276,7 +286,7 @@ export default function MenuModal({ product, onClose, onAddToCart }) {
                     key={topping.id}
                     onClick={() => handleToggleTopping(topping.id)}
                     type="button"
-                    className={`group py-2.5 px-3.5 rounded-full border transition-all duration-200 flex items-center justify-between text-left active:scale-[0.98] ${
+                    className={`group py-2.5 px-3.5 rounded-full border transition-all duration-200 flex items-center justify-between text-left active:scale-[0.98] cursor-pointer ${
                       isSelected
                         ? `${topping.activeStyle} shadow-sm`
                         : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 shadow-sm shadow-slate-100/50'
@@ -313,7 +323,7 @@ export default function MenuModal({ product, onClose, onAddToCart }) {
               <button
                 type="button"
                 onClick={() => setPakaiSayur(true)}
-                className={`py-2.5 px-3.5 rounded-full border transition-all duration-200 flex items-center justify-between text-left active:scale-[0.98] ${
+                className={`py-2.5 px-3.5 rounded-full border transition-all duration-200 flex items-center justify-between text-left active:scale-[0.98] cursor-pointer ${
                   pakaiSayur 
                     ? 'border-emerald-500 text-emerald-700 bg-emerald-50 shadow-sm' 
                     : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
@@ -335,7 +345,7 @@ export default function MenuModal({ product, onClose, onAddToCart }) {
               <button
                 type="button"
                 onClick={() => setPakaiSayur(false)}
-                className={`py-2.5 px-3.5 rounded-full border transition-all duration-200 flex items-center justify-between text-left active:scale-[0.98] ${
+                className={`py-2.5 px-3.5 rounded-full border transition-all duration-200 flex items-center justify-between text-left active:scale-[0.98] cursor-pointer ${
                   !pakaiSayur 
                     ? 'border-slate-400 text-slate-600 bg-slate-50 shadow-sm' 
                     : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
@@ -373,7 +383,7 @@ export default function MenuModal({ product, onClose, onAddToCart }) {
                     key={saus.id}
                     onClick={() => handleToggleSaus(saus.id)}
                     type="button"
-                    className={`group py-2.5 px-3.5 rounded-full border transition-all duration-200 flex items-center justify-between text-left active:scale-[0.98] ${
+                    className={`group py-2.5 px-3.5 rounded-full border transition-all duration-200 flex items-center justify-between text-left active:scale-[0.98] cursor-pointer ${
                       isSelected
                         ? `${saus.activeStyle} shadow-sm`
                         : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 shadow-sm shadow-slate-100/50'
@@ -416,8 +426,8 @@ export default function MenuModal({ product, onClose, onAddToCart }) {
           <div className="flex items-center gap-3 bg-slate-50 p-1.5 rounded-full border border-slate-100 shrink-0">
             <button
               onClick={() => setQuantity((prev) => Math.max(1, prev - 1))}
-              className="w-10 h-10 rounded-full bg-white hover:bg-slate-100 flex items-center justify-center text-slate-600 disabled:opacity-40 transition-colors shadow-sm"
-              disabled={quantity <= 1}
+              className="w-10 h-10 rounded-full bg-white hover:bg-slate-100 flex items-center justify-center text-slate-600 disabled:opacity-40 transition-colors shadow-sm cursor-pointer disabled:cursor-not-allowed"
+              disabled={quantity <= 1 || !isOpenStore}
             >
               <Minus className="w-4 h-4 stroke-[2.5]" />
             </button>
@@ -426,22 +436,36 @@ export default function MenuModal({ product, onClose, onAddToCart }) {
             </span>
             <button
               onClick={() => setQuantity((prev) => prev + 1)}
-              className="w-10 h-10 rounded-full bg-red-600 hover:bg-red-700 flex items-center justify-center text-white transition-colors shadow-sm shadow-red-500/30"
+              className="w-10 h-10 rounded-full bg-red-600 hover:bg-red-700 disabled:bg-slate-300 flex items-center justify-center text-white transition-colors shadow-sm shadow-red-500/30 cursor-pointer disabled:cursor-not-allowed"
+              disabled={!isOpenStore}
             >
               <Plus className="w-4 h-4 stroke-[2.5]" />
             </button>
           </div>
 
-          <button
-            onClick={handleAdd}
-            className="flex-1 bg-red-600 hover:bg-red-700 text-white py-4 px-5 rounded-full text-xs font-black tracking-widest uppercase flex items-center justify-between transition-all active:scale-[0.98] shadow-lg shadow-red-600/25"
-            style={{ fontFamily: "'Montserrat', sans-serif" }}
-          >
-            <span>{product.editingIndex !== undefined ? 'SIMPAN PERUBAHAN' : 'TAMBAH KE KERANJANG'}</span>
-            <span className="bg-white/20 px-2.5 py-1 rounded-full text-white font-black backdrop-blur-sm">
-              Rp {totalPrice.toLocaleString('id-ID')}
-            </span>
-          </button>
+          {isOpenStore ? (
+            <button
+              type="button"
+              onClick={handleAdd}
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white py-4 px-5 rounded-full text-xs font-black tracking-widest uppercase flex items-center justify-between transition-all active:scale-[0.98] shadow-lg shadow-red-600/25 cursor-pointer"
+              style={{ fontFamily: "'Montserrat', sans-serif" }}
+            >
+              <span>{product.editingIndex !== undefined ? 'SIMPAN PERUBAHAN' : 'TAMBAH KE KERANJANG'}</span>
+              <span className="bg-white/20 px-2.5 py-1 rounded-full text-white font-black backdrop-blur-sm">
+                Rp {totalPrice.toLocaleString('id-ID')}
+              </span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled
+              className="flex-1 bg-slate-200 border border-slate-300 text-slate-400 py-4 px-5 rounded-full text-xs font-black tracking-widest uppercase flex items-center justify-center gap-2 cursor-not-allowed select-none"
+              style={{ fontFamily: "'Montserrat', sans-serif" }}
+            >
+              <Store className="w-4 h-4 text-slate-400" />
+              <span>TOKO SEDANG TUTUP (VIEW ONLY)</span>
+            </button>
+          )}
         </div>
 
       </div>

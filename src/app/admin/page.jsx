@@ -54,6 +54,9 @@ export default function AdminDashboard() {
 
     const syncData = () => {
       try {
+        const savedStatus = localStorage.getItem('siboy_store_status');
+        if (savedStatus !== null) setIsOpen(JSON.parse(savedStatus));
+
         const savedPrices = localStorage.getItem('siboy_prices');
         if (savedPrices) setPrices(JSON.parse(savedPrices));
         
@@ -69,6 +72,14 @@ export default function AdminDashboard() {
     window.addEventListener('storage', syncData);
     return () => window.removeEventListener('storage', syncData);
   }, [router]);
+
+  // Handler Sinkronisasi Status Buka / Tutup Toko
+  const toggleStoreStatus = () => {
+    const nextStatus = !isOpen;
+    setIsOpen(nextStatus);
+    localStorage.setItem('siboy_store_status', JSON.stringify(nextStatus));
+    window.dispatchEvent(new Event('storage'));
+  };
 
   const getPeriodLabel = () => {
     if (period === 'today') return 'Hari Ini';
@@ -144,7 +155,6 @@ export default function AdminDashboard() {
   if (period === 'month') mult = 30;
   if (period === 'date') mult = 1;
 
-  // Base Daily Demo Data
   const baseDailyRev = 345000;
   const baseDailySold = 28;
   
@@ -344,13 +354,14 @@ export default function AdminDashboard() {
               )}
             </div>
 
+            {/* SAKELAR BUKA / TUTUP SINKRON KE LOCALSTORAGE */}
             <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 px-2 py-1.5 rounded-full">
               <span className={`text-[10px] font-black uppercase tracking-wider ml-1 ${isOpen ? 'text-emerald-600' : 'text-slate-400'}`}>
                 {isOpen ? 'Buka' : 'Tutup'}
               </span>
               <button 
                 type="button"
-                onClick={() => setIsOpen(!isOpen)} 
+                onClick={toggleStoreStatus} 
                 className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer shadow-inner ${isOpen ? 'bg-emerald-500' : 'bg-slate-300'}`}
               >
                 <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${isOpen ? 'translate-x-5' : 'translate-x-1'}`}/>
@@ -421,8 +432,6 @@ export default function AdminDashboard() {
             </div>
 
             <div className="w-full pt-8 pb-2 relative">
-              
-              {/* Dark Floating Tooltip */}
               {hoveredHour !== null && (
                 <div 
                   className="absolute z-20 bg-slate-900 text-white text-[10px] font-black tracking-widest uppercase px-3.5 py-2 rounded-xl shadow-xl pointer-events-none transform -translate-x-1/2 -translate-y-full transition-all duration-200 flex flex-col items-center gap-1"
@@ -475,8 +484,6 @@ export default function AdminDashboard() {
             <div className="h-32 flex items-end justify-between gap-1.5 pt-4 border-b border-slate-100 pb-2 mt-4">
               {daysTraffic.map((d, idx) => (
                 <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end group cursor-pointer relative">
-                  
-                  {/* Tooltip Bar Hover */}
                   <div className="absolute -top-7 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 text-white text-[9px] font-black uppercase px-2 py-1 rounded-md pointer-events-none whitespace-nowrap z-10">
                     {d.val} Kotak
                     <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-900 rotate-45"></div>

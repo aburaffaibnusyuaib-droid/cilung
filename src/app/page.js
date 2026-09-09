@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Hero from '@/components/Hero';
 import Menu from '@/components/Menu'; 
@@ -10,6 +10,7 @@ import Cart from '@/components/Cart';
 import Qris from '@/components/Qris'; 
 
 export default function Home() {
+  const [isOpen, setIsOpen] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -19,6 +20,29 @@ export default function Home() {
   // STATE QRIS DAN PENYIMPANAN LINK WA
   const [isQrisOpen, setIsQrisOpen] = useState(false);
   const [waUrl, setWaUrl] = useState('');
+
+  // Sinkronisasi status buka/tutup toko terpusat
+  useEffect(() => {
+    const checkStoreStatus = () => {
+      try {
+        const saved = localStorage.getItem('siboy_store_status');
+        if (saved !== null) {
+          setIsOpen(JSON.parse(saved));
+        }
+      } catch (e) {}
+    };
+
+    checkStoreStatus();
+    window.addEventListener('storage', checkStoreStatus);
+    window.addEventListener('focus', checkStoreStatus);
+    const interval = setInterval(checkStoreStatus, 500);
+
+    return () => {
+      window.removeEventListener('storage', checkStoreStatus);
+      window.removeEventListener('focus', checkStoreStatus);
+      clearInterval(interval);
+    };
+  }, []);
 
   const cartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
   const cartTotal = cartItems.reduce((acc, item) => acc + (item.totalPrice || 0), 0);
@@ -37,6 +61,8 @@ export default function Home() {
   };
 
   const handleAddToCart = (orderData) => {
+    if (!isOpen) return; // Guard clause pencegahan order saat toko tutup
+
     if (editingIndex !== null) {
       setCartItems((prev) => {
         const updated = [...prev];
@@ -78,6 +104,7 @@ export default function Home() {
       />
 
       <Hero 
+        isOpen={isOpen}
         onOrderClick={() => {
           const el = document.getElementById('menu');
           if (el) el.scrollIntoView({ behavior: 'smooth' });
@@ -86,6 +113,7 @@ export default function Home() {
 
       <div className="relative z-10 w-full overflow-hidden">
         <Menu 
+          isOpen={isOpen}
           onSelectPackage={handleSelectPackage} 
         />
       </div>
@@ -99,6 +127,7 @@ export default function Home() {
           key={editingIndex !== null ? `edit-${editingIndex}` : `new-${selectedProduct.id || Date.now()}`}
           product={selectedProduct} 
           isEditMode={editingIndex !== null}
+          isOpenStore={isOpen}
           onClose={() => {
             setIsModalOpen(false);
             setEditingIndex(null);
@@ -123,22 +152,23 @@ export default function Home() {
       {/* KERANJANG */}
       <Cart 
         isOpen={isCartOpen}
+        isOpenStore={isOpen}
         onClose={() => setIsCartOpen(false)}
         cartItems={cartItems}
         onUpdateQuantity={handleUpdateQuantity}
         onRemoveItem={handleRemoveItem}
         onEditItem={handleEditItem}
         onClearCart={handleClearCart}
-        
-        // PROPS BARU UNTUK 2 TOMBOL CHECKOUT
         onCheckoutCash={(url) => {
+          if (!isOpen) return;
           window.open(url, '_blank');
           handleClearCart();
           setIsCartOpen(false);
         }}
         onCheckoutQris={(url) => {
-          setWaUrl(url); // Simpan link WA yang bawa data nama
-          setIsQrisOpen(true); // Buka popup QRIS
+          if (!isOpen) return;
+          setWaUrl(url);
+          setIsQrisOpen(true);
         }}
       />
     </main>

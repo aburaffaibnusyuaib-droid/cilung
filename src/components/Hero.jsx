@@ -1,17 +1,50 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import {
   ShoppingCart,
   Flame,
-  Sliders,
-  Zap,
-  Store,
-  MapPin
+  Sparkles,
+  QrCode,
+  ShieldCheck,
+  MapPin,
+  Store
 } from 'lucide-react';
 
 export default function Hero({ onOrderClick }) {
+  const [isOpen, setIsOpen] = useState(true);
+
+  // SINKRONISASI MULTI-TAB & REAL-TIME DARI DASHBOARD
+  useEffect(() => {
+    const checkStoreStatus = () => {
+      try {
+        const saved = localStorage.getItem('siboy_store_status');
+        if (saved !== null) {
+          setIsOpen(JSON.parse(saved));
+        }
+      } catch (e) {}
+    };
+
+    // 1. Cek saat pertama kali dibuka
+    checkStoreStatus();
+
+    // 2. Tangkap event storage saat tab Dashboard digeser
+    window.addEventListener('storage', checkStoreStatus);
+
+    // 3. Tangkap saat user balik fokus ke tab Landing Page
+    window.addEventListener('focus', checkStoreStatus);
+
+    // 4. Polling ringan (tiap 500ms) agar dijamin 100% instan tanpa delay
+    const interval = setInterval(checkStoreStatus, 500);
+
+    return () => {
+      window.removeEventListener('storage', checkStoreStatus);
+      window.removeEventListener('focus', checkStoreStatus);
+      clearInterval(interval);
+    };
+  }, []);
+
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: `
@@ -64,16 +97,30 @@ export default function Hero({ onOrderClick }) {
               </h1>
             </div>
 
+            {/* TOMBOL PESAN: BERUBAH ABU-ABU JIKA TOKO TUTUP */}
             <div className="pt-8 sm:pt-10 lg:pt-12 w-full animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
-              <button
-                onClick={onOrderClick}
-                className="group relative w-full sm:w-max px-8 py-4 bg-red-600 text-white font-black text-xs sm:text-sm uppercase tracking-widest rounded-full breathing-glow hover:-translate-y-1 transition-all duration-300 ease-out flex items-center justify-center gap-3 cursor-pointer"
-              >
-                <ShoppingCart className="w-5 h-5 text-amber-300 animate-bounce shrink-0" />
-                <span className="relative z-10">Pesan Sekarang</span>
-              </button>
+              {isOpen ? (
+                <button
+                  type="button"
+                  onClick={onOrderClick}
+                  className="group relative w-full sm:w-max px-8 py-4 bg-red-600 text-white font-black text-xs sm:text-sm uppercase tracking-widest rounded-full breathing-glow hover:-translate-y-1 transition-all duration-300 ease-out flex items-center justify-center gap-3 cursor-pointer"
+                >
+                  <ShoppingCart className="w-5 h-5 text-amber-300 animate-bounce shrink-0" />
+                  <span className="relative z-10">Pesan Sekarang</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  className="group relative w-full sm:w-max px-8 py-4 bg-slate-200 text-slate-400 border border-slate-300 font-black text-xs sm:text-sm uppercase tracking-widest rounded-full flex items-center justify-center gap-3 cursor-not-allowed shadow-none"
+                >
+                  <Store className="w-5 h-5 text-slate-400 shrink-0" />
+                  <span>Toko Sedang Tutup</span>
+                </button>
+              )}
             </div>
 
+            {/* 4 KARTU KEUNGGULAN TERBARU */}
             <div className="mt-10 lg:mt-12 w-full grid grid-cols-2 gap-3 sm:gap-4 max-w-xl mx-auto lg:mx-0">
               
               <div className="group bg-white p-3.5 sm:p-4 rounded-2xl border-2 border-slate-100 shadow-sm hover:shadow-lg hover:shadow-red-500/20 hover:border-red-400 flex items-center gap-3 sm:gap-4 transition-all duration-200 ease-in-out cursor-default hover:-translate-y-1 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-300 fill-mode-both">
@@ -82,37 +129,37 @@ export default function Hero({ onOrderClick }) {
                 </div>
                 <div className="text-left">
                   <p className="text-[11px] sm:text-xs font-black text-slate-900 group-hover:text-red-600 uppercase transition-colors duration-200 ease-in-out">Dibuat Fresh</p>
-                  <p className="text-[9px] sm:text-[10px] font-bold text-slate-500 mt-0.5">Dadakan di loyang</p>
+                  <p className="text-[9px] sm:text-[10px] font-bold text-slate-500 mt-0.5">Dadakan dari loyang panas</p>
                 </div>
               </div>
 
               <div className="group bg-white p-3.5 sm:p-4 rounded-2xl border-2 border-slate-100 shadow-sm hover:shadow-lg hover:shadow-amber-500/20 hover:border-amber-400 flex items-center gap-3 sm:gap-4 transition-all duration-200 ease-in-out cursor-default hover:-translate-y-1 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-400 fill-mode-both">
                 <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center shrink-0 group-hover:bg-amber-500 group-hover:text-white transition-colors duration-200 ease-in-out">
-                  <Sliders className="w-5 h-5 transform transition-transform duration-200 ease-in-out group-hover:scale-125 group-hover:-rotate-12" />
+                  <Sparkles className="w-5 h-5 transform transition-transform duration-200 ease-in-out group-hover:scale-125 group-hover:-rotate-12" />
                 </div>
                 <div className="text-left">
-                  <p className="text-[11px] sm:text-xs font-black text-slate-900 group-hover:text-amber-600 uppercase transition-colors duration-200 ease-in-out">Mix Toping</p>
-                  <p className="text-[9px] sm:text-[10px] font-bold text-slate-500 mt-0.5">Isian sesukamu</p>
+                  <p className="text-[11px] sm:text-xs font-black text-slate-900 group-hover:text-amber-600 uppercase transition-colors duration-200 ease-in-out">Bebas Mix Toping</p>
+                  <p className="text-[9px] sm:text-[10px] font-bold text-slate-500 mt-0.5">Bebas pilih isian tanpa biaya</p>
                 </div>
               </div>
 
-              <div className="group bg-white p-3.5 sm:p-4 rounded-2xl border-2 border-slate-100 shadow-sm hover:shadow-lg hover:shadow-purple-500/20 hover:border-purple-400 flex items-center gap-3 sm:gap-4 transition-all duration-200 ease-in-out cursor-default hover:-translate-y-1 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-500 fill-mode-both">
-                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 group-hover:bg-purple-600 group-hover:text-white transition-colors duration-200 ease-in-out">
-                  <Zap className="w-5 h-5 transform transition-transform duration-200 ease-in-out group-hover:scale-125 group-hover:rotate-12" />
+              <div className="group bg-white p-3.5 sm:p-4 rounded-2xl border-2 border-slate-100 shadow-sm hover:shadow-lg hover:shadow-sky-500/20 hover:border-sky-400 flex items-center gap-3 sm:gap-4 transition-all duration-200 ease-in-out cursor-default hover:-translate-y-1 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-500 fill-mode-both">
+                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-sky-50 text-sky-500 flex items-center justify-center shrink-0 group-hover:bg-sky-500 group-hover:text-white transition-colors duration-200 ease-in-out">
+                  <QrCode className="w-5 h-5 transform transition-transform duration-200 ease-in-out group-hover:scale-125 group-hover:rotate-12" />
                 </div>
                 <div className="text-left">
-                  <p className="text-[11px] sm:text-xs font-black text-slate-900 group-hover:text-purple-600 uppercase transition-colors duration-200 ease-in-out">Pesan WA</p>
-                  <p className="text-[9px] sm:text-[10px] font-bold text-slate-500 mt-0.5">Gak perlu antre</p>
+                  <p className="text-[11px] sm:text-xs font-black text-slate-900 group-hover:text-sky-600 uppercase transition-colors duration-200 ease-in-out">Live Queue Tracker</p>
+                  <p className="text-[9px] sm:text-[10px] font-bold text-slate-500 mt-0.5">Pantau pesanan via QR karcis</p>
                 </div>
               </div>
 
               <div className="group bg-white p-3.5 sm:p-4 rounded-2xl border-2 border-slate-100 shadow-sm hover:shadow-lg hover:shadow-emerald-500/20 hover:border-emerald-400 flex items-center gap-3 sm:gap-4 transition-all duration-200 ease-in-out cursor-default hover:-translate-y-1 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-600 fill-mode-both">
                 <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 group-hover:bg-emerald-600 group-hover:text-white transition-colors duration-200 ease-in-out">
-                  <Store className="w-5 h-5 transform transition-transform duration-200 ease-in-out group-hover:scale-125 group-hover:-rotate-12" />
+                  <ShieldCheck className="w-5 h-5 transform transition-transform duration-200 ease-in-out group-hover:scale-125 group-hover:-rotate-12" />
                 </div>
                 <div className="text-left">
-                  <p className="text-[11px] sm:text-xs font-black text-slate-900 group-hover:text-emerald-600 uppercase transition-colors duration-200 ease-in-out">Lapak Netap</p>
-                  <p className="text-[9px] sm:text-[10px] font-bold text-slate-500 mt-0.5">Tinggal samperin</p>
+                  <p className="text-[11px] sm:text-xs font-black text-slate-900 group-hover:text-emerald-600 uppercase transition-colors duration-200 ease-in-out">100% Higienis</p>
+                  <p className="text-[9px] sm:text-[10px] font-bold text-slate-500 mt-0.5">Bahan tertutup & tempat bersih</p>
                 </div>
               </div>
 
@@ -125,7 +172,7 @@ export default function Hero({ onOrderClick }) {
               
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[110%] sm:w-[120%] aspect-square bg-red-600 rounded-full z-0 opacity-90 shadow-2xl shadow-red-600/30 animate-in zoom-in-50 fade-in duration-1000 delay-300 fill-mode-both ease-out" />
               
-              <div className="absolute inset-0 overflow-hidden bg-white z-10 shadow-xl animate-in fade-in zoom-in-95 duration-1000 delay-500 fill-mode-both ease-out " 
+              <div className="absolute inset-0 overflow-hidden bg-white z-10 shadow-xl animate-in fade-in zoom-in-95 duration-1000 delay-500 fill-mode-both ease-out" 
                    style={{ 
                      borderRadius: '255px 15px 225px 15px / 15px 225px 15px 255px', 
                      border: '4px solid #0f172a' 
@@ -140,15 +187,30 @@ export default function Hero({ onOrderClick }) {
                 />
               </div>
 
-              {/* Status Operasional Dinamis Menggantikan Best Seller */}
+              {/* ===================================================================== */}
+              {/* BAGIAN YANG DILINGKARI MERAH: STATUS OPERASIONAL DINAMIS DARI DASHBOARD */}
+              {/* ===================================================================== */}
               <div className="absolute -top-3 -left-3 sm:-top-4 sm:-left-6 z-20 animate-in fade-in slide-in-from-top-4 duration-700 delay-700 fill-mode-both">
-                <div className="bg-white/95 backdrop-blur-sm border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.08)] rounded-full px-4 py-2 sm:py-2.5 flex items-center gap-2.5">
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                  </span>
-                  <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-slate-900 leading-none mt-0.5">Buka | 16.00 - 22.00</span>
-                </div>
+                {isOpen ? (
+                  <div className="bg-white/95 backdrop-blur-sm border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.08)] rounded-full px-4 py-2 sm:py-2.5 flex items-center gap-2.5 transition-all">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                    </span>
+                    <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-slate-900 leading-none mt-0.5">
+                      Buka
+                    </span>
+                  </div>
+                ) : (
+                  <div className="bg-slate-900/90 text-white backdrop-blur-sm border border-slate-700 shadow-[0_8px_30px_rgb(0,0,0,0.2)] rounded-full px-4 py-2 sm:py-2.5 flex items-center gap-2.5 transition-all">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
+                    </span>
+                    <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-white leading-none mt-0.5">
+                      Tutup
+                    </span>
+                  </div>
+                )}
               </div>
 
               <a href="#lokasi" className="absolute -bottom-4 -right-2 sm:-bottom-6 sm:-right-4 z-20 flex items-center gap-3 bg-white p-2 sm:p-2.5 pr-4 sm:pr-5 rounded-2xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:-translate-y-1 hover:shadow-[0_15px_40px_rgb(0,0,0,0.12)] transition-all duration-300 ease-out cursor-pointer group/loc animate-in fade-in slide-in-from-bottom-4 duration-700 delay-1000 fill-mode-both">
