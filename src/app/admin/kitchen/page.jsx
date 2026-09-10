@@ -1,20 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
-  Bell, BellOff, Flame, CheckCircle2, RotateCcw, AlertTriangle, Clock, Menu
+  Bell, BellOff, Flame, CheckCircle2, RotateCcw, Clock, Menu,
+  Hourglass, Check, X, ShieldAlert, Sparkles, ChefHat
 } from 'lucide-react';
 
 import AdminSidebar from '@/components/AdminSidebar';
-
-// DATA CADANGAN AWAL (JIKA STORAGE KOSONG)
-const DEFAULT_KITCHEN_ORDERS = [
-  { id: 'SB-101', qNo: '#01', time: '13:15', timer: '8 Menit', status: 'cooking', name: 'Budi Santoso', type: 'Porsi Besar (10 pcs)', toppings: 'Keju Mozza, Sosis', veg: 'Kol & Daun Bawang', spicy: 'Pedas Sedang (Lv 2)', note: '' },
-  { id: 'SB-102', qNo: '#02', time: '13:20', timer: '3 Menit', status: 'pending', name: 'Siti Rahma', type: 'Porsi Special (15 pcs)', toppings: 'Katsuobushi', veg: 'Tanpa Sayur', spicy: 'Tidak Pedas', note: 'Katsuobushi pisah di plastik' },
-  { id: 'SB-104', qNo: '#03', time: '13:40', timer: 'Baru Masuk', status: 'pending', name: 'Anisa', type: 'Porsi Besar (10 pcs)', toppings: 'Crabstick', veg: 'Kol Saja', spicy: 'Pedas Sedang (Lv 3)', note: '' },
-  { id: 'SB-105', qNo: '#04', time: '14:05', timer: 'Baru Masuk', status: 'pending', name: 'Mikel', type: 'Porsi Sedang (7 pcs)', toppings: 'Sosis', veg: 'Full Sayur', spicy: 'Tidak Pedas', note: '' },
-];
 
 export default function KitchenView() {
   const router = useRouter();
@@ -22,14 +15,33 @@ export default function KitchenView() {
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
   
-  // State Pesanan KDS Terpusat
+  // Tab Switcher untuk Mobile
+  const [mobileTab, setMobileTab] = useState('waiting'); // 'waiting' | 'pending' | 'cooking'
+
   const [orders, setOrders] = useState([]);
-  
-  // State untuk Fitur Undo (Toast Notification)
   const [toastMessage, setToastMessage] = useState(null);
   const [lastFinishedOrder, setLastFinishedOrder] = useState(null);
 
-  // Inisialisasi Auth & Sinkronisasi Data Dinamis
+  const prevWaitingCountRef = useRef(0);
+
+  const playAlertSound = () => {
+    if (!isSoundEnabled) return;
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+      osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.4);
+    } catch (e) {}
+  };
+
   useEffect(() => {
     setIsMounted(true);
     const auth = localStorage.getItem('admin_auth');
@@ -39,40 +51,89 @@ export default function KitchenView() {
       try {
         const saved = localStorage.getItem('siboy_kitchen_orders');
         if (saved) {
-          setOrders(JSON.parse(saved));
+          const parsed = JSON.parse(saved);
+          setOrders(parsed);
+
+          const waitingCount = parsed.filter(o => o.status === 'waiting_verification').length;
+          if (waitingCount > prevWaitingCountRef.current) {
+            playAlertSound();
+            // Otomatis pindah tab ke waiting jika ada pesanan baru di mobile
+            setMobileTab('waiting');
+          }
+          prevWaitingCountRef.current = waitingCount;
         } else {
-          setOrders(DEFAULT_KITCHEN_ORDERS);
-          localStorage.setItem('siboy_kitchen_orders', JSON.stringify(DEFAULT_KITCHEN_ORDERS));
+          setOrders([]);
         }
       } catch (e) {
-        setOrders(DEFAULT_KITCHEN_ORDERS);
+        setOrders([]);
       }
     };
 
     loadOrders();
     window.addEventListener('storage', loadOrders);
-    return () => window.removeEventListener('storage', loadOrders);
-  }, [router]);
+    const interval = setInterval(loadOrders, 1000);
 
-  // Simpan Perubahan ke Storage & Broadcast ke Tab Lain
+    return () => {
+      window.removeEventListener('storage', loadOrders);
+      clearInterval(interval);
+    };
+  }, [router, isSoundEnabled]);
+
   const updateOrdersState = (newOrders) => {
     setOrders(newOrders);
     localStorage.setItem('siboy_kitchen_orders', JSON.stringify(newOrders));
+    
+    try {
+      const history = JSON.parse(localStorage.getItem('siboy_order_history') || '[]');
+      const updatedHistory = history.map(h => {
+        const match = newOrders.find(o => o.id === h.id);
+        return match ? { ...h, status: match.status } : h;
+      });
+      localStorage.setItem('siboy_order_history', JSON.stringify(updatedHistory));
+    } catch (e) {}
+
     window.dispatchEvent(new Event('storage'));
   };
 
-  // ================= FUNGSI ALUR KERJA (FLOW) =================
+  // 1. Verifikasi Masuk ke Antrean Siap Masak (Waiting -> Pending)
+  const verifyToPending = (orderId) => {
+    const updated = orders.map(o => o.id === orderId ? { ...o, status: 'pending' } : o);
+    updateOrdersState(updated);
+  };
+
+  // 2. Tolak Pesanan Fiktif
+  const rejectOrder = (orderId) => {
+    const updated = orders.filter(o => o.id !== orderId);
+    updateOrdersState(updated);
+
+    try {
+      const history = JSON.parse(localStorage.getItem('siboy_order_history') || '[]');
+      const updatedHistory = history.filter(h => h.id !== orderId);
+      localStorage.setItem('siboy_order_history', JSON.stringify(updatedHistory));
+      window.dispatchEvent(new Event('storage'));
+    } catch (e) {}
+  };
+
+  // 3. Masukkan ke Wajan (Pending -> Cooking)
   const moveToCooking = (id) => {
     const updated = orders.map(o => o.id === id ? { ...o, status: 'cooking' } : o);
     updateOrdersState(updated);
   };
 
+  // 4. Selesai (Cooking -> Ready)
   const finishOrder = (order) => {
     const updated = orders.filter(o => o.id !== order.id);
     updateOrdersState(updated);
     
+    try {
+      const history = JSON.parse(localStorage.getItem('siboy_order_history') || '[]');
+      const updatedHistory = history.map(h => h.id === order.id ? { ...h, status: 'ready' } : h);
+      localStorage.setItem('siboy_order_history', JSON.stringify(updatedHistory));
+      window.dispatchEvent(new Event('storage'));
+    } catch (e) {}
+
     setLastFinishedOrder(order);
-    setToastMessage(`Pesanan ${order.qNo} (${order.name}) Selesai!`);
+    setToastMessage(`Pesanan ${order.qNo} (${order.customerName || order.name}) Selesai!`);
     
     setTimeout(() => {
       setToastMessage(null);
@@ -82,13 +143,14 @@ export default function KitchenView() {
 
   const undoFinish = () => {
     if (lastFinishedOrder) {
-      const restored = [...orders, lastFinishedOrder].sort((a, b) => a.qNo.localeCompare(b.qNo));
+      const restored = [...orders, { ...lastFinishedOrder, status: 'cooking' }].sort((a, b) => a.qNo.localeCompare(b.qNo));
       updateOrdersState(restored);
       setToastMessage(null);
       setLastFinishedOrder(null);
     }
   };
 
+  const waitingOrders = orders.filter(o => o.status === 'waiting_verification');
   const pendingOrders = orders.filter(o => o.status === 'pending');
   const cookingOrders = orders.filter(o => o.status === 'cooking');
 
@@ -99,147 +161,297 @@ export default function KitchenView() {
       
       <div className="absolute inset-0 pointer-events-none z-0" style={{ backgroundSize: '32px 32px', backgroundImage: 'linear-gradient(to right, rgba(0, 0, 0, 0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(0, 0, 0, 0.04) 1px, transparent 1px)' }} />
 
-      <div className={`max-w-[1600px] mx-auto px-3 sm:px-6 pt-4 sm:pt-6 relative z-10 transition-all duration-300 ${isSidebarOpen ? 'opacity-40 blur-sm pointer-events-none' : ''}`}>
+      <div className={`max-w-[1700px] mx-auto px-3 sm:px-6 pt-4 sm:pt-6 relative z-10 transition-all duration-300 ${isSidebarOpen ? 'opacity-40 blur-sm pointer-events-none' : ''}`}>
         
-        {/* ================= COMPACT HEADER ================= */}
-        <div className="bg-white/80 backdrop-blur-md rounded-2xl border-2 border-slate-100 p-3 sm:px-5 shadow-sm flex items-center justify-between gap-4 mb-6">
+        {/* COMPACT HEADER */}
+        <div className="bg-white/90 backdrop-blur-md rounded-2xl border-2 border-slate-100 p-3 sm:px-5 shadow-sm flex items-center justify-between gap-4 mb-4 sm:mb-6">
           <div className="flex items-center gap-3">
             <button 
               type="button"
               onClick={() => setIsSidebarOpen(true)} 
-              className="w-12 h-12 bg-white text-amber-500 hover:bg-amber-50 border-2 border-slate-100 hover:border-amber-200 rounded-2xl transition-all flex items-center justify-center shadow-sm cursor-pointer active:scale-95"
+              className="w-11 h-11 sm:w-12 sm:h-12 bg-white text-red-600 hover:bg-red-50 border-2 border-slate-100 hover:border-red-200 rounded-2xl transition-all flex items-center justify-center shadow-sm cursor-pointer active:scale-95"
             >
-              <Menu className="w-6 h-6 stroke-[2.5]" />
+              <Menu className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.5]" />
             </button>
             <div>
-              <h1 className="text-lg sm:text-2xl font-black uppercase tracking-tight text-slate-800 leading-none" style={{ fontFamily: "'Montserrat', sans-serif" }}>
-                KITCHEN <span className="text-amber-500">VIEW</span>
+              <h1 className="text-base sm:text-2xl font-black uppercase tracking-tight text-slate-800 leading-none" style={{ fontFamily: "'Montserrat', sans-serif" }}>
+                KITCHEN <span className="text-red-600">KDS</span>
               </h1>
-              <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 mt-0.5">Sistem Monitor Dapur (KDS)</p>
+              <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 mt-0.5">Sistem Monitor Alur Dapur</p>
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <button 
               type="button"
               onClick={() => setIsSoundEnabled(!isSoundEnabled)} 
-              className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest border-2 transition-all cursor-pointer shadow-sm ${isSoundEnabled ? 'bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100' : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100'}`}
-              title="Notifikasi Suara Dapur"
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border-2 transition-all cursor-pointer shadow-sm ${isSoundEnabled ? 'bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100' : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100'}`}
             >
-              {isSoundEnabled ? <Bell className="w-4 h-4 animate-pulse" /> : <BellOff className="w-4 h-4" />}
-              <span className="hidden sm:block">{isSoundEnabled ? 'Suara Aktif' : 'Suara Mati'}</span>
+              {isSoundEnabled ? <Bell className="w-3.5 h-3.5 animate-pulse" /> : <BellOff className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline">{isSoundEnabled ? 'Suara Aktif' : 'Mute'}</span>
             </button>
           </div>
         </div>
 
-        {/* ================= KANBAN BOARD (2 KOLOM) ================= */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        {/* SEGMENTED TAB BAR KHUSUS MOBILE */}
+        <div className="lg:hidden grid grid-cols-3 gap-1.5 p-1.5 bg-slate-200/70 backdrop-blur-md rounded-2xl mb-4 sticky top-2 z-30 shadow-sm">
+          <button
+            type="button"
+            onClick={() => setMobileTab('waiting')}
+            className={`py-2.5 px-1 rounded-xl font-black text-[10px] uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${
+              mobileTab === 'waiting'
+                ? 'bg-amber-500 text-slate-950 shadow-md'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Hourglass className="w-3.5 h-3.5" />
+            <span>Verif</span>
+            <span className="bg-slate-950/20 px-1.5 py-0.2 rounded-full text-[9px]">{waitingOrders.length}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMobileTab('pending')}
+            className={`py-2.5 px-1 rounded-xl font-black text-[10px] uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${
+              mobileTab === 'pending'
+                ? 'bg-sky-600 text-white shadow-md'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <ChefHat className="w-3.5 h-3.5" />
+            <span>Antrean</span>
+            <span className="bg-white/20 px-1.5 py-0.2 rounded-full text-[9px]">{pendingOrders.length}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMobileTab('cooking')}
+            className={`py-2.5 px-1 rounded-xl font-black text-[10px] uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${
+              mobileTab === 'cooking'
+                ? 'bg-red-600 text-white shadow-md'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Flame className="w-3.5 h-3.5" />
+            <span>Wajan</span>
+            <span className="bg-white/20 px-1.5 py-0.2 rounded-full text-[9px]">{cookingOrders.length}</span>
+          </button>
+        </div>
+
+        {/* ================= 3 KOLOM UTAMA (DESKTOP GRID / MOBILE TAB ROUTED) ================= */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6 items-start">
           
-          {/* KOLOM 1: ANTREAN MASUK */}
-          <div className="bg-slate-100/50 rounded-3xl p-4 sm:p-5 border-2 border-slate-200/60 min-h-[500px]">
-            <div className="flex items-center justify-between mb-4 border-b-2 border-slate-200 pb-3">
+          {/* KOLOM 1: VERIFIKASI KASIR (KUNING AMBER) */}
+          <div className={`bg-amber-500/5 rounded-3xl p-3.5 sm:p-5 border-2 border-amber-300/80 min-h-[500px] ${
+            mobileTab !== 'waiting' ? 'hidden lg:block' : 'block'
+          }`}>
+            <div className="flex items-center justify-between mb-4 border-b-2 border-amber-200 pb-3">
               <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-slate-400 animate-pulse"></span>
-                <h2 className="text-sm font-black uppercase tracking-widest text-slate-700">Antrean Masuk</h2>
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                </span>
+                <h2 className="text-xs sm:text-sm font-black uppercase tracking-wider text-amber-950">1. Perlu Verifikasi</h2>
               </div>
-              <span className="bg-white text-slate-800 text-[10px] font-black px-2.5 py-1 rounded-lg border-2 border-slate-200 shadow-sm">{pendingOrders.length} Pesanan</span>
+              <span className="bg-amber-500 text-slate-950 text-[10px] font-black px-2.5 py-1 rounded-lg shadow-xs">
+                {waitingOrders.length} Masuk
+              </span>
             </div>
-            
-            <div className="space-y-4">
-              {pendingOrders.length === 0 && <p className="text-center text-sm font-bold text-slate-400 mt-10">Tidak ada antrean baru.</p>}
-              {pendingOrders.map(order => (
-                <div key={order.id} className="bg-white border-l-4 border-l-slate-400 border-y-2 border-r-2 border-slate-100 rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-all">
-                  <div className="flex justify-between items-start mb-3 border-b border-slate-100 pb-3">
-                    <div className="flex items-center gap-3">
-                      <span className="text-4xl font-black text-slate-800 tracking-tighter leading-none">{order.qNo}</span>
+
+            <div className="space-y-3.5">
+              {waitingOrders.length === 0 && (
+                <div className="py-14 text-center">
+                  <CheckCircle2 className="w-8 h-8 text-amber-300 mx-auto mb-2" />
+                  <p className="text-xs font-bold text-amber-700/70">Semua pesanan online sudah terverifikasi.</p>
+                </div>
+              )}
+
+              {waitingOrders.map(order => (
+                <div key={order.id} className="bg-white border-2 border-amber-300 rounded-2xl p-4 shadow-sm relative overflow-hidden space-y-3">
+                  <div className="flex justify-between items-start border-b border-slate-100 pb-2.5">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-3xl sm:text-4xl font-black text-amber-600 tracking-tighter leading-none">{order.qNo}</span>
                       <div>
-                        <span className="text-[10px] font-black text-slate-400 block mb-0.5">{order.id}</span>
-                        <span className="text-xs font-bold text-slate-600">{order.time} WIB</span>
+                        <span className="text-[9px] font-black text-slate-400 block">{order.id} • {order.time}</span>
+                        <h4 className="text-xs sm:text-sm font-black text-slate-900 uppercase truncate max-w-[120px] sm:max-w-[150px]">
+                          {order.customerName || order.name}
+                        </h4>
                       </div>
                     </div>
-                    <div className={`flex items-center gap-1 text-[10px] font-black uppercase px-2 py-1 rounded-md border-2 ${order.timer.includes('Menit') && parseInt(order.timer) > 5 ? 'bg-red-50 text-red-600 border-red-200 animate-pulse' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
-                      <Clock className="w-3 h-3" /> {order.timer}
-                    </div>
-                  </div>
-                  
-                  <div className="mb-4">
-                    <h3 className="text-lg font-black text-slate-900 leading-tight mb-1">{order.type}</h3>
-                    <p className="text-xs font-bold text-slate-500">Atas Nama: <span className="text-slate-800 uppercase font-black">{order.name}</span></p>
+                    <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-200">
+                      {order.pay || 'QRIS'}
+                    </span>
                   </div>
 
-                  <div className="flex flex-wrap gap-2 mb-5">
-                    <span className="inline-flex text-[10px] font-black uppercase bg-slate-100 text-slate-600 border border-slate-200 px-2.5 py-1 rounded-lg">
-                      Topping: {order.toppings}
+                  <div className="space-y-1.5 text-xs font-bold text-slate-700">
+                    {order.items && Array.isArray(order.items) ? (
+                      order.items.map((it, idx) => (
+                        <div key={idx} className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                          <div className="flex justify-between text-slate-900 font-black text-xs">
+                            <span>{it.qty}x {it.name}</span>
+                            <span className="text-red-600">Rp {(it.price * it.qty).toLocaleString('id-ID')}</span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 mt-0.5 font-medium">{it.toppings} • {it.veg} • {it.spicy}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs font-bold text-slate-800">{order.type}</p>
+                    )}
+
+                    {order.notes && (
+                      <p className="text-[10px] text-amber-900 italic bg-amber-50 p-2 rounded-lg border border-amber-200">
+                        Catatan: "{order.notes}"
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase">Total:</span>
+                    <span className="text-sm font-black text-red-600">{order.total}</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => rejectOrder(order.id)}
+                      className="py-2.5 px-2 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-[10px] font-black uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center gap-1"
+                    >
+                      <X className="w-3.5 h-3.5" /> Tolak
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => verifyToPending(order.id)}
+                      className="py-2.5 px-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-[10px] font-black uppercase tracking-wider transition-all shadow-md shadow-sky-600/20 active:scale-95 cursor-pointer flex items-center justify-center gap-1"
+                    >
+                      <Check className="w-3.5 h-3.5 stroke-[3]" /> Terima Antrean
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* KOLOM 2: ANTREAN SIAP MASAK (BIRU SKY) */}
+          <div className={`bg-sky-500/5 rounded-3xl p-3.5 sm:p-5 border-2 border-sky-300/80 min-h-[500px] ${
+            mobileTab !== 'pending' ? 'hidden lg:block' : 'block'
+          }`}>
+            <div className="flex items-center justify-between mb-4 border-b-2 border-sky-200 pb-3">
+              <div className="flex items-center gap-2">
+                <ChefHat className="w-4 h-4 text-sky-600" />
+                <h2 className="text-xs sm:text-sm font-black uppercase tracking-wider text-sky-950">2. Siap Masak</h2>
+              </div>
+              <span className="bg-sky-600 text-white text-[10px] font-black px-2.5 py-1 rounded-lg shadow-xs">
+                {pendingOrders.length} Antre
+              </span>
+            </div>
+
+            <div className="space-y-3.5">
+              {pendingOrders.length === 0 && (
+                <div className="py-14 text-center">
+                  <Clock className="w-8 h-8 text-sky-300 mx-auto mb-2" />
+                  <p className="text-xs font-bold text-sky-700/70">Tidak ada antrean tunggu.</p>
+                </div>
+              )}
+
+              {pendingOrders.map(order => (
+                <div key={order.id} className="bg-white border-2 border-sky-300 rounded-2xl p-4 shadow-sm space-y-3">
+                  <div className="flex justify-between items-start border-b border-slate-100 pb-2.5">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-3xl sm:text-4xl font-black text-sky-600 tracking-tighter leading-none">{order.qNo}</span>
+                      <div>
+                        <span className="text-[9px] font-black text-slate-400 block">{order.id} • {order.time}</span>
+                        <h4 className="text-xs sm:text-sm font-black text-slate-900 uppercase truncate max-w-[120px] sm:max-w-[150px]">
+                          {order.customerName || order.name}
+                        </h4>
+                      </div>
+                    </div>
+                    <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200">
+                      Terkonfirmasi
                     </span>
-                    <span className="inline-flex text-[10px] font-black uppercase bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-lg">
-                      Sayur: {order.veg}
-                    </span>
-                    <span className="inline-flex text-[10px] font-black uppercase bg-red-50 text-red-700 border border-red-200 px-2.5 py-1 rounded-lg">
-                      Level: {order.spicy}
-                    </span>
-                    {order.note && (
-                      <span className="inline-flex items-center gap-1 w-full mt-1 text-[10px] font-black uppercase bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1.5 rounded-lg">
-                        <AlertTriangle className="w-3.5 h-3.5" /> CATATAN: {order.note}
-                      </span>
+                  </div>
+
+                  <div className="space-y-1.5 text-xs font-bold text-slate-700">
+                    {order.items && Array.isArray(order.items) ? (
+                      order.items.map((it, idx) => (
+                        <div key={idx} className="bg-slate-50 p-2 rounded-xl text-xs font-bold">
+                          <span className="text-slate-900">{it.qty}x {it.name}</span>
+                          <p className="text-[10px] text-slate-500 mt-0.5">{it.toppings} • {it.veg} • {it.spicy}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs font-bold text-slate-800">{order.type}</p>
                     )}
                   </div>
 
                   <button 
                     type="button"
                     onClick={() => moveToCooking(order.id)} 
-                    className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-widest py-3.5 rounded-xl transition-colors shadow-[0_4px_15px_rgb(79,70,229,0.3)] cursor-pointer active:scale-[0.98]"
+                    className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase tracking-widest py-3 rounded-xl transition-all shadow-md shadow-red-600/20 cursor-pointer active:scale-[0.98]"
                   >
-                    <Flame className="w-4 h-4" /> Mulai Masak
+                    <Flame className="w-4 h-4" /> Masukkan ke Wajan
                   </button>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* KOLOM 2: SEDANG DIMASAK */}
-          <div className="bg-amber-50/50 rounded-3xl p-4 sm:p-5 border-2 border-amber-200/50 min-h-[500px]">
-            <div className="flex items-center justify-between mb-4 border-b-2 border-amber-200 pb-3">
+          {/* KOLOM 3: SEDANG DIMASAK DI WAJAN (MERAH API SIBOY) */}
+          <div className={`bg-red-500/5 rounded-3xl p-3.5 sm:p-5 border-2 border-red-300/80 min-h-[500px] ${
+            mobileTab !== 'cooking' ? 'hidden lg:block' : 'block'
+          }`}>
+            <div className="flex items-center justify-between mb-4 border-b-2 border-red-200 pb-3">
               <div className="flex items-center gap-2">
-                <Flame className="w-4 h-4 text-amber-500" />
-                <h2 className="text-sm font-black uppercase tracking-widest text-amber-700">Sedang Dimasak</h2>
+                <Flame className="w-4 h-4 text-red-600" />
+                <h2 className="text-xs sm:text-sm font-black uppercase tracking-wider text-red-950">3. Di Atas Wajan</h2>
               </div>
-              <span className="bg-amber-500 text-white text-[10px] font-black px-2.5 py-1 rounded-lg shadow-sm">{cookingOrders.length} Wajan</span>
+              <span className="bg-red-600 text-white text-[10px] font-black px-2.5 py-1 rounded-lg shadow-xs">
+                {cookingOrders.length} Dipanggang
+              </span>
             </div>
-            
-            <div className="space-y-4">
-              {cookingOrders.length === 0 && <p className="text-center text-sm font-bold text-amber-400 mt-10">Belum ada yang dimasak.</p>}
+
+            <div className="space-y-3.5">
+              {cookingOrders.length === 0 && (
+                <div className="py-14 text-center">
+                  <Flame className="w-8 h-8 text-red-300 mx-auto mb-2" />
+                  <p className="text-xs font-bold text-red-700/70">Wajan sedang kosong.</p>
+                </div>
+              )}
+
               {cookingOrders.map(order => (
-                <div key={order.id} className="bg-white border-l-4 border-l-amber-500 border-y-2 border-r-2 border-amber-100 rounded-2xl p-4 sm:p-5 shadow-md transition-all">
-                  <div className="flex justify-between items-start mb-3 border-b border-amber-100 pb-3">
-                    <div className="flex items-center gap-3">
-                      <span className="text-4xl font-black text-amber-600 tracking-tighter leading-none">{order.qNo}</span>
+                <div key={order.id} className="bg-white border-2 border-red-400 rounded-2xl p-4 shadow-sm space-y-3">
+                  <div className="flex justify-between items-start border-b border-slate-100 pb-2.5">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-3xl sm:text-4xl font-black text-red-600 tracking-tighter leading-none">{order.qNo}</span>
                       <div>
-                        <span className="text-[10px] font-black text-amber-400 block mb-0.5">{order.id}</span>
-                        <span className="text-xs font-bold text-slate-600">{order.time} WIB</span>
+                        <span className="text-[9px] font-black text-slate-400 block">{order.id} • {order.time}</span>
+                        <h4 className="text-xs sm:text-sm font-black text-slate-900 uppercase truncate max-w-[120px] sm:max-w-[150px]">
+                          {order.customerName || order.name}
+                        </h4>
                       </div>
                     </div>
-                  </div>
-                  
-                  <div className="mb-4">
-                    <h3 className="text-lg font-black text-slate-900 leading-tight mb-1">{order.type}</h3>
-                    <p className="text-xs font-bold text-slate-500">Atas Nama: <span className="text-slate-800 uppercase font-black">{order.name}</span></p>
+                    <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-red-50 text-red-600 border border-red-200 animate-pulse">
+                      Dipanggang
+                    </span>
                   </div>
 
-                  <div className="flex flex-wrap gap-2 mb-5">
-                    <span className="inline-flex text-[10px] font-black uppercase bg-slate-100 text-slate-600 border border-slate-200 px-2.5 py-1 rounded-lg">Topping: {order.toppings}</span>
-                    <span className="inline-flex text-[10px] font-black uppercase bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-lg">Sayur: {order.veg}</span>
-                    <span className="inline-flex text-[10px] font-black uppercase bg-red-50 text-red-700 border border-red-200 px-2.5 py-1 rounded-lg">Level: {order.spicy}</span>
-                    {order.note && (
-                      <span className="inline-flex items-center gap-1 w-full mt-1 text-[10px] font-black uppercase bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1.5 rounded-lg">
-                        <AlertTriangle className="w-3.5 h-3.5" /> CATATAN: {order.note}
-                      </span>
+                  <div className="space-y-1.5 text-xs font-bold text-slate-700">
+                    {order.items && Array.isArray(order.items) ? (
+                      order.items.map((it, idx) => (
+                        <div key={idx} className="bg-red-50/50 border border-red-100 p-2 rounded-xl text-xs font-bold">
+                          <span className="text-slate-900">{it.qty}x {it.name}</span>
+                          <p className="text-[10px] text-slate-500 mt-0.5">{it.toppings} • {it.veg} • {it.spicy}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs font-bold text-slate-800">{order.type}</p>
                     )}
                   </div>
 
                   <button 
                     type="button"
                     onClick={() => finishOrder(order)} 
-                    className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black uppercase tracking-widest py-3.5 rounded-xl transition-colors shadow-[0_4px_15px_rgb(16,185,129,0.3)] cursor-pointer active:scale-[0.98]"
+                    className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black uppercase tracking-widest py-3 rounded-xl transition-all shadow-md shadow-emerald-500/20 cursor-pointer active:scale-[0.98]"
                   >
                     <CheckCircle2 className="w-4 h-4" /> Angkat & Selesai
                   </button>
@@ -251,7 +463,7 @@ export default function KitchenView() {
         </div>
       </div>
 
-      {/* ================= UNDO TOAST NOTIFICATION ================= */}
+      {/* TOAST NOTIFIKASI UNDO */}
       {toastMessage && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-bottom-5">
           <CheckCircle2 className="w-5 h-5 text-emerald-400" />
@@ -263,7 +475,7 @@ export default function KitchenView() {
         </div>
       )}
 
-      {/* ================= SIDEBAR GLOBAL ================= */}
+      {/* SIDEBAR GLOBAL */}
       <AdminSidebar 
         isOpen={isSidebarOpen} 
         setIsOpen={setIsSidebarOpen} 

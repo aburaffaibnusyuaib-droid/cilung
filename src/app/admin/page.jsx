@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   DollarSign, ShoppingBag, Clock, TrendingUp, ArrowUpRight,
-  Settings2, X, Plus, Trash2, RefreshCw, Activity, Calendar, CalendarDays
+  Settings2, X, Plus, Trash2, RefreshCw, Activity, Calendar, RotateCcw
 } from 'lucide-react';
 
 import AdminSidebar from '@/components/AdminSidebar';
@@ -28,8 +28,8 @@ export default function AdminDashboard() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
 
-  // SAKELAR MODE (Desktop Only)
-  const [isDemoMode, setIsDemoMode] = useState(true);
+  // SAKELAR MODE
+  const [isDemoMode, setIsDemoMode] = useState(false);
   
   // STATE UI
   const [activeHour, setActiveHour] = useState(2);
@@ -57,6 +57,9 @@ export default function AdminDashboard() {
         const savedStatus = localStorage.getItem('siboy_store_status');
         if (savedStatus !== null) setIsOpen(JSON.parse(savedStatus));
 
+        const savedDemo = localStorage.getItem('siboy_demo_mode');
+        if (savedDemo !== null) setIsDemoMode(JSON.parse(savedDemo));
+
         const savedPrices = localStorage.getItem('siboy_prices');
         if (savedPrices) setPrices(JSON.parse(savedPrices));
         
@@ -73,11 +76,17 @@ export default function AdminDashboard() {
     return () => window.removeEventListener('storage', syncData);
   }, [router]);
 
-  // Handler Sinkronisasi Status Buka / Tutup Toko
   const toggleStoreStatus = () => {
     const nextStatus = !isOpen;
     setIsOpen(nextStatus);
     localStorage.setItem('siboy_store_status', JSON.stringify(nextStatus));
+    window.dispatchEvent(new Event('storage'));
+  };
+
+  const toggleDemoMode = () => {
+    const nextMode = !isDemoMode;
+    setIsDemoMode(nextMode);
+    localStorage.setItem('siboy_demo_mode', JSON.stringify(nextMode));
     window.dispatchEvent(new Event('storage'));
   };
 
@@ -86,12 +95,13 @@ export default function AdminDashboard() {
     if (period === 'week') return '7 Hari Terakhir';
     if (period === 'month') return 'Bulan Ini';
     if (period === 'date' && selectedDate) {
-      return new Date(selectedDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+      const [y, m, d] = selectedDate.split('-').map(Number);
+      return new Date(y, m - 1, d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
     }
     return 'Hari Ini';
   };
 
-  // 2. Kalkulasi Data Real (Sesuai Filter 'Period')
+  // 2. Kalkulasi Data Transaksi Riil
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
@@ -99,57 +109,82 @@ export default function AdminDashboard() {
   let liveSold = 0;
   let sHour = { 16: 0, 17: 0, 18: 0, 19: 0, 20: 0, 21: 0, 22: 0 };
   let sDay = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
-  let pType = { besar: 0, sedang: 0, special: 0 };
+  let pType = { besar: 0, kecil: 0, special: 0 };
 
   rawHistory.forEach(ord => {
-    if (!ord.timestamp) return;
-    const ordTimeMs = new Date(ord.timestamp).getTime();
-    const ordTimeObj = new Date(ord.timestamp);
+    const orderTimestamp = ord.timestamp || (ord.date ? new Date(ord.date).getTime() : null);
+    if (!orderTimestamp) return;
+
+    const ordTimeObj = new Date(orderTimestamp);
+    const ordTimeMs = ordTimeObj.getTime();
 
     let include = false;
     if (period === 'today') {
-      include = ordTimeMs >= todayStart;
+      include = ordTimeMs >= todayStart && ordTimeMs < todayStart + 24 * 60 * 60 * 1000;
     } else if (period === 'week') {
       include = ordTimeMs >= (todayStart - 6 * 24 * 60 * 60 * 1000);
     } else if (period === 'month') {
       include = ordTimeObj.getMonth() === now.getMonth() && ordTimeObj.getFullYear() === now.getFullYear();
     } else if (period === 'date' && selectedDate) {
-      const sDate = new Date(selectedDate);
-      include = ordTimeObj.getDate() === sDate.getDate() && 
-                ordTimeObj.getMonth() === sDate.getMonth() && 
-                ordTimeObj.getFullYear() === sDate.getFullYear();
+      const [tY, tM, tD] = selectedDate.split('-').map(Number);
+      include = ordTimeObj.getDate() === tD && 
+                ordTimeObj.getMonth() === (tM - 1) && 
+                ordTimeObj.getFullYear() === tY;
     }
 
     if (include) {
-      liveRev += (ord.rawTotal || 0);
-      
+      // Menghitung omzet riil
+      const rawVal = ord.rawTotal ?? (ord.total ? parseInt(String(ord.total).replace(/[^0-9]/g, ''), 10) : 0);
+      liveRev += Number(rawVal) || 0;
+
       let qtyInOrder = 0;
-      if (ord.items && Array.isArray(ord.items)) {
+
+      // Fallback deteksi menu jika dari Self-Order atau POS
+      if (ord.items && Array.isArray(ord.items) && ord.items.length > 0) {
         ord.items.forEach(it => {
-          const q = it.qty || 1;
+          const q = Number(it.qty || it.quantity || 1);
           qtyInOrder += q;
-          const n = it.name.toLowerCase();
+          const n = (it.name || '').toLowerCase();
           if (n.includes('besar')) pType.besar += q;
           else if (n.includes('special')) pType.special += q;
-          else pType.sedang += q;
+          else pType.kecil += q;
+        });
+      } else if (ord.type) {
+        const typeStr = String(ord.type).toLowerCase();
+        const parts = typeStr.split('+');
+        parts.forEach(p => {
+          const matchQty = p.match(/(\d+)\s*x/);
+          const q = matchQty ? parseInt(matchQty[1], 10) : 1;
+          qtyInOrder += q;
+          if (p.includes('besar')) pType.besar += q;
+          else if (p.includes('special')) pType.special += q;
+          else pType.kecil += q;
         });
       } else {
         qtyInOrder = 1;
         pType.besar += 1;
       }
+
       liveSold += qtyInOrder;
 
+      // Sebaran Jam Ramai (16:00 - 22:00)
       const h = ordTimeObj.getHours();
-      if (h >= 16 && h <= 22) sHour[h] += qtyInOrder;
-      else sHour[16] += qtyInOrder; 
-      
+      if (h >= 16 && h <= 22) {
+        sHour[h] += qtyInOrder;
+      } else if (h < 16) {
+        sHour[16] += qtyInOrder;
+      } else {
+        sHour[22] += qtyInOrder;
+      }
+
+      // Sebaran Hari (Senin = 0 s/d Minggu = 6)
       const jsDay = ordTimeObj.getDay();
       const d = jsDay === 0 ? 6 : jsDay - 1;
       sDay[d] += qtyInOrder;
     }
   });
 
-  // 3. Kalkulasi Pengali Data Demo
+  // 3. Kalkulasi Pengali Mode Demo
   let mult = 1;
   if (period === 'week') mult = 7;
   if (period === 'month') mult = 30;
@@ -164,7 +199,7 @@ export default function AdminDashboard() {
   const displayAvg = `Rp ${finalAvg.toLocaleString('id-ID')}`;
   const activeAntrean = isDemoMode && period !== 'date' ? Math.max(4, kitchenCount) : kitchenCount;
 
-  // BUILDER GRAFIK: Jam Ramai (Wave)
+  // BUILDER GRAFIK: Jam Ramai
   const baseWave = [4, 12, 18, 15, 9, 6, 2].map(v => Math.round(v * mult));
   const waveData = baseWave.map((bVal, i) => {
     const h = 16 + i;
@@ -178,7 +213,7 @@ export default function AdminDashboard() {
   const areaPathData = `${pathData} L 445 90 L 25 90 Z`;
   const topHour = waveData.reduce((max, obj) => obj.val > max.val ? obj : max, waveData[0]);
 
-  // BUILDER GRAFIK: Siklus Harian (Pill)
+  // BUILDER GRAFIK: Siklus Harian
   const baseDays = [20, 24, 22, 29, 38, 44, 32].map(v => Math.round(v * (mult / 7 || 1)));
   const dayNames = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
   
@@ -194,11 +229,11 @@ export default function AdminDashboard() {
   });
 
   // BUILDER GRAFIK: Tipe Kardus (Donut)
-  const basePortions = { besar: Math.round(15 * mult), sedang: Math.round(9 * mult), special: Math.round(4 * mult) };
+  const basePortions = { besar: Math.round(15 * mult), kecil: Math.round(9 * mult), special: Math.round(4 * mult) };
   const portionData = [
     { label: 'Porsi Besar', pcs: (isDemoMode ? basePortions.besar : 0) + pType.besar, color: '#ef4444' },
-    { label: 'Porsi Sedang', pcs: (isDemoMode ? basePortions.sedang : 0) + pType.sedang, color: '#3b82f6' },
-    { label: 'Special', pcs: (isDemoMode ? basePortions.special : 0) + pType.special, color: '#10b981' }
+    { label: 'Porsi Kecil', pcs: (isDemoMode ? basePortions.kecil : 0) + pType.kecil, color: '#3b82f6' },
+    { label: 'Porsi Special', pcs: (isDemoMode ? basePortions.special : 0) + pType.special, color: '#10b981' }
   ];
 
   const totalBox = portionData.reduce((acc, curr) => acc + curr.pcs, 0);
@@ -211,7 +246,7 @@ export default function AdminDashboard() {
     cumulativeOffset -= pct;
   });
 
-  // Fungsi Action Form Drawer
+  // Action Drawer
   const handlePriceChange = (key, value) => {
     const val = parseInt(value, 10) || 0;
     const updated = { ...prices, [key]: val };
@@ -248,7 +283,8 @@ export default function AdminDashboard() {
     setToppings(updated);
     localStorage.setItem('siboy_toppings', JSON.stringify(updated));
     window.dispatchEvent(new Event('storage'));
-    setNewToppingName(''); setToppingError('');
+    setNewToppingName(''); 
+    setToppingError('');
   };
 
   const handleDeleteTopping = (id) => {
@@ -263,15 +299,14 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-[#faf9f6] text-slate-900 relative pb-16 overflow-x-hidden" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
       
-      {/* Background Grid Style */}
+      {/* Background Grid Accent */}
       <div className="absolute inset-0 pointer-events-none z-0" style={{ backgroundSize: '32px 32px', backgroundImage: 'linear-gradient(to right, rgba(0, 0, 0, 0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(0, 0, 0, 0.04) 1px, transparent 1px)' }} />
 
       <div className={`max-w-7xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8 relative z-10 space-y-6 transition-all duration-300 ${isDrawerOpen || isSidebarOpen ? 'opacity-40 blur-sm pointer-events-none' : ''}`}>
         
-        {/* HEADER & TOGGLE MODE */}
+        {/* HEADER & FILTER */}
         <div className="bg-white/80 backdrop-blur-md rounded-3xl border-2 border-slate-100 p-4 sm:p-5 sm:px-7 shadow-sm flex flex-col sm:flex-row gap-4 justify-between items-center relative z-20">
           
-          {/* Logo Kiri */}
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <button 
               type="button"
@@ -290,20 +325,31 @@ export default function AdminDashboard() {
                   POS <svg className="absolute w-full h-2 -bottom-0.5 left-0 text-amber-400 z-[-1]" viewBox="0 0 100 20" preserveAspectRatio="none"><path d="M5 12 Q 30 5 70 12 T 95 12" stroke="currentColor" strokeWidth="6" strokeLinecap="round" fill="transparent" /></svg>
                 </span>
               </div>
-              <p className="text-[10px] sm:text-[11px] font-bold text-slate-400">Dashboard {getPeriodLabel()}</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <p className="text-[10px] sm:text-[11px] font-bold text-slate-400">Dashboard {getPeriodLabel()}</p>
+                {period === 'date' && (
+                  <button 
+                    type="button"
+                    onClick={() => { setPeriod('today'); setSelectedDate(''); }}
+                    className="text-[9px] font-black uppercase text-red-600 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <RotateCcw className="w-2.5 h-2.5" /> Hari Ini
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Action Kanan (Kalender & Toggle) */}
+          {/* Action Kanan: Kalender & Toggle Mode */}
           <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
             
-            {/* Mode Demo (Desktop Only) */}
             <button 
-              onClick={() => setIsDemoMode(!isDemoMode)}
+              type="button"
+              onClick={toggleDemoMode}
               className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border-2 text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer ${
-                isDemoMode ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100' : 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100'
+                isDemoMode ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100' : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
               }`}
-              title="Ganti antara Data Demo (Presentasi) dan Data Lapangan Asli (Real 0)"
+              title="Ganti Mode Simulasi (DEMO) atau Data Kasir Murni (LIVE)"
             >
               <Activity className="w-3.5 h-3.5" />
               Mode: {isDemoMode ? 'DEMO' : 'LIVE'}
@@ -311,11 +357,15 @@ export default function AdminDashboard() {
 
             <div className="w-px h-6 bg-slate-200 hidden sm:block"></div>
 
-            {/* Filter Kalender Dropdown (Mobile + Desktop UX Terpadu) */}
+            {/* Filter Kalender Popover */}
             <div className="relative">
               <button 
+                type="button" 
                 onClick={() => setIsFilterOpen(!isFilterOpen)}
-                className="w-8 h-8 sm:w-10 sm:h-10 bg-white border border-slate-200 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-colors shadow-sm cursor-pointer"
+                className={`w-9 h-9 sm:w-10 sm:h-10 border rounded-full flex items-center justify-center transition-colors shadow-sm cursor-pointer ${
+                  period === 'date' ? 'bg-red-500 text-white border-red-500' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}
+                title="Pilih Periode / Tanggal"
               >
                 <Calendar className="w-4 h-4" />
               </button>
@@ -325,11 +375,16 @@ export default function AdminDashboard() {
                   <div className="fixed inset-0 z-40" onClick={() => setIsFilterOpen(false)}></div>
                   <div className="absolute right-0 top-12 w-56 bg-white rounded-2xl shadow-2xl border border-slate-100 p-3 z-50 animate-in fade-in zoom-in-95">
                     <div className="flex flex-col gap-1 mb-3">
-                      {[{id: 'today', l: 'Hari Ini'}, {id: 'week', l: '7 Hari Terakhir'}, {id: 'month', l: 'Bulan Ini'}].map(p => (
+                      {[
+                        { id: 'today', l: 'Hari Ini' }, 
+                        { id: 'week', l: '7 Hari Terakhir' }, 
+                        { id: 'month', l: 'Bulan Ini' }
+                      ].map(p => (
                         <button 
                           key={p.id}
-                          onClick={() => { setPeriod(p.id); setIsFilterOpen(false); }}
-                          className={`text-left text-xs font-bold px-3 py-2.5 rounded-xl transition-colors ${period === p.id ? 'bg-red-50 text-red-700' : 'text-slate-600 hover:bg-slate-50'}`}
+                          type="button"
+                          onClick={() => { setPeriod(p.id); setSelectedDate(''); setIsFilterOpen(false); }}
+                          className={`text-left text-xs font-bold px-3 py-2.5 rounded-xl transition-colors cursor-pointer ${period === p.id && !selectedDate ? 'bg-red-50 text-red-700' : 'text-slate-600 hover:bg-slate-50'}`}
                         >
                           {p.l}
                         </button>
@@ -337,7 +392,7 @@ export default function AdminDashboard() {
                     </div>
 
                     <div className="border-t border-slate-100 pt-3">
-                      <span className="text-[10px] font-black uppercase text-slate-400 mb-2 block px-1">Pilih Tanggal Spesifik</span>
+                      <span className="text-[10px] font-black uppercase text-slate-400 mb-2 block px-1">Pilih Tanggal Tertentu</span>
                       <input 
                         type="date" 
                         value={selectedDate} 
@@ -346,7 +401,7 @@ export default function AdminDashboard() {
                           setPeriod('date');
                           setIsFilterOpen(false);
                         }} 
-                        className="w-full text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:border-red-400 cursor-pointer" 
+                        className="w-full text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-red-400 cursor-pointer" 
                       />
                     </div>
                   </div>
@@ -354,7 +409,7 @@ export default function AdminDashboard() {
               )}
             </div>
 
-            {/* SAKELAR BUKA / TUTUP SINKRON KE LOCALSTORAGE */}
+            {/* Toggle Status Buka / Tutup */}
             <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 px-2 py-1.5 rounded-full">
               <span className={`text-[10px] font-black uppercase tracking-wider ml-1 ${isOpen ? 'text-emerald-600' : 'text-slate-400'}`}>
                 {isOpen ? 'Buka' : 'Tutup'}
@@ -381,8 +436,8 @@ export default function AdminDashboard() {
               <p className="text-2xl sm:text-3xl font-black text-white tracking-tight" style={{ fontFamily: "'Montserrat', sans-serif" }}>Rp {finalRev.toLocaleString('id-ID')}</p>
             </div>
             <div className="pt-3 border-t border-white/20 flex items-center justify-between text-[10px] sm:text-xs font-bold text-white/90 mt-5">
-              {isDemoMode && period === 'today' ? <span className="flex items-center gap-1.5"><TrendingUp className="w-3.5 h-3.5"/> +15%</span> : <span>Update {getPeriodLabel()}</span>}
-              <span className="text-white/70">Terminal Kasir</span>
+              {isDemoMode && period === 'today' ? <span className="flex items-center gap-1.5"><TrendingUp className="w-3.5 h-3.5"/> +15% vs kemarin</span> : <span>Omzet {getPeriodLabel()}</span>}
+              <span className="text-white/70">Akumulasi Kasir</span>
             </div>
           </div>
           
@@ -392,34 +447,34 @@ export default function AdminDashboard() {
                 <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest">Porsi Keluar</span>
                 <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-white/20 flex items-center justify-center"><ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5 text-white" /></div>
               </div>
-              <p className="text-2xl sm:text-3xl font-black text-white tracking-tight" style={{ fontFamily: "'Montserrat', sans-serif" }}>{finalSold} <span className="text-sm font-bold text-white/80">Kotak</span></p>
+              <p className="text-2xl sm:text-3xl font-black text-white tracking-tight" style={{ fontFamily: "'Montserrat', sans-serif" }}>{finalSold} <span className="text-sm font-bold text-white/80">Porsi</span></p>
             </div>
             <div className="pt-3 border-t border-white/20 flex items-center justify-between text-[10px] sm:text-xs font-bold text-white/90 mt-5">
-              <span className="text-white/70">Rata-rata order</span><span>{displayAvg}</span>
+              <span className="text-white/70">Rata-rata per order</span><span>{displayAvg}</span>
             </div>
           </div>
 
           <div className="bg-gradient-to-br from-sky-500 to-blue-600 rounded-3xl p-5 sm:p-6 text-white shadow-[0_12px_30px_rgb(14,165,233,0.2)] flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between text-white/80 mb-2">
-                <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest">Antrean Aktif</span>
+                <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest">Antrean Dapur</span>
                 <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-white/20 flex items-center justify-center"><Clock className="w-4 h-4 sm:w-5 sm:h-5 text-white" /></div>
               </div>
               <p className="text-2xl sm:text-3xl font-black text-white tracking-tight" style={{ fontFamily: "'Montserrat', sans-serif" }}>{activeAntrean} <span className="text-sm font-bold text-white/80">Pesanan</span></p>
             </div>
             <div className="pt-3 border-t border-white/20 flex items-center justify-between text-[10px] sm:text-xs font-bold text-white/90 mt-5">
-              <span className="text-white/80">Menunggu Dimasak</span>
-              <button onClick={() => router.push('/admin/kitchen')} className="inline-flex items-center gap-1 bg-white/20 px-2 py-1 rounded-lg hover:bg-white/30 text-white font-black cursor-pointer transition-colors">
+              <span className="text-white/80">Di Layar KDS</span>
+              <button type="button" onClick={() => router.push('/admin/kitchen')} className="inline-flex items-center gap-1 bg-white/20 px-2 py-1 rounded-lg hover:bg-white/30 text-white font-black cursor-pointer transition-colors">
                 Kitchen <ArrowUpRight className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
         </div>
 
-        {/* AREA GRAFIK INTERAKTIF */}
+        {/* AREA GRAFIK */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
           
-          {/* Grafik 1: SVG Wave Jam Ramai Dinamis */}
+          {/* Wave Jam Ramai */}
           <div className="lg:col-span-5 bg-white rounded-3xl border-2 border-slate-100 p-5 sm:p-6 shadow-sm flex flex-col justify-between relative">
             <div className="flex items-start justify-between pb-3 border-b border-slate-100">
               <div>
@@ -454,7 +509,7 @@ export default function AdminDashboard() {
                 <line x1="25" y1="50" x2="445" y2="50" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="4 4" />
                 <line x1="25" y1="85" x2="445" y2="85" stroke="#e2e8f0" strokeWidth="1" />
                 
-                {totalBox > 0 && <path d={areaPathData} fill="url(#glowRed)" />}
+                {finalSold > 0 && <path d={areaPathData} fill="url(#glowRed)" />}
                 <path d={pathData} fill="none" stroke="#dc2626" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
                 
                 {waveData.map((pt, i) => (
@@ -471,11 +526,11 @@ export default function AdminDashboard() {
             
             <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 flex items-center justify-between text-[10px] font-bold text-slate-600 mt-2">
               <span>Jam Terpilih: <strong className="text-red-600">{waveData[activeHour].hour} WIB</strong></span>
-              <span>Total: <strong className="text-slate-900">{waveData[activeHour].val} Kotak</strong></span>
+              <span>Total: <strong className="text-slate-900">{waveData[activeHour].val} Porsi</strong></span>
             </div>
           </div>
 
-          {/* Grafik 2: Siklus Penjualan Harian */}
+          {/* Siklus Harian */}
           <div className="lg:col-span-3 bg-white rounded-3xl border-2 border-slate-100 p-5 sm:p-6 shadow-sm flex flex-col justify-between">
             <div className="pb-3 border-b border-slate-100">
               <h3 className="text-sm font-black uppercase tracking-wider text-slate-800" style={{ fontFamily: "'Montserrat', sans-serif" }}>Siklus</h3>
@@ -485,7 +540,7 @@ export default function AdminDashboard() {
               {daysTraffic.map((d, idx) => (
                 <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end group cursor-pointer relative">
                   <div className="absolute -top-7 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 text-white text-[9px] font-black uppercase px-2 py-1 rounded-md pointer-events-none whitespace-nowrap z-10">
-                    {d.val} Kotak
+                    {d.val} Porsi
                     <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-900 rotate-45"></div>
                   </div>
 
@@ -501,12 +556,12 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* Grafik 3: Donut Chart Porsi */}
+          {/* Donut Chart: Kardus / Porsi */}
           <div className="lg:col-span-4 bg-white rounded-3xl border-2 border-slate-100 p-5 sm:p-6 shadow-sm flex flex-col sm:flex-row gap-6 items-center">
             <div className="flex-1 w-full text-left sm:border-r border-slate-100 sm:pr-4">
               <div className="pb-2 border-b border-slate-100 mb-3">
                 <h3 className="text-sm font-black uppercase tracking-wider text-slate-800" style={{ fontFamily: "'Montserrat', sans-serif" }}>Tipe Kardus</h3>
-                <p className="text-[11px] font-bold text-slate-400 mt-0.5">Data {getPeriodLabel()}</p>
+                <p className="text-[11px] font-bold text-slate-400 mt-0.5">Sebaran {getPeriodLabel()}</p>
               </div>
               <div className="flex flex-col gap-2.5">
                 {portionData.map((slice, i) => (
@@ -540,10 +595,10 @@ export default function AdminDashboard() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 mb-4 border-b border-slate-100">
             <div>
               <h3 className="text-sm font-black uppercase tracking-wider text-slate-800" style={{ fontFamily: "'Montserrat', sans-serif" }}>Ketersediaan Topping</h3>
-              <p className="text-[11px] font-bold text-slate-400 mt-0.5">Klik kartu untuk ubah status cepat atau atur di Panel.</p>
+              <p className="text-[11px] font-bold text-slate-400 mt-0.5">Klik kartu untuk ubah status instan atau kelola lewat Panel.</p>
             </div>
             <button 
-              type="button"
+              type="button" 
               onClick={() => setIsDrawerOpen(true)} 
               className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-700 bg-white hover:bg-slate-50 px-4 py-2.5 rounded-xl border-2 border-slate-200 transition-all cursor-pointer shadow-sm active:scale-95"
             >
@@ -561,7 +616,7 @@ export default function AdminDashboard() {
                   top.status === 'Menipis' ? 'bg-amber-50/50 border-amber-200 hover:border-amber-300' :
                   'bg-slate-50 border-slate-200 opacity-60'
                 }`}
-                title="Klik untuk putar status bahan"
+                title="Klik untuk ubah status bahan"
               >
                 <div className="flex items-center justify-between">
                   <span className={`text-xs font-black truncate ${top.status === 'Habis' ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{top.name}</span>
@@ -592,9 +647,9 @@ export default function AdminDashboard() {
         <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
           <div>
             <h2 className="text-lg font-black uppercase tracking-tight text-slate-800" style={{ fontFamily: "'Montserrat', sans-serif" }}>Pengaturan Menu</h2>
-            <p className="text-xs font-bold text-slate-400 mt-0.5">Ubah harga jual porsi & status stok bahan.</p>
+            <p className="text-xs font-bold text-slate-400 mt-0.5">Ubah harga jual porsi & status persediaan bahan.</p>
           </div>
-          <button onClick={() => setIsDrawerOpen(false)} className="w-9 h-9 bg-white border border-slate-200 rounded-full flex items-center justify-center text-slate-400 hover:text-red-500 cursor-pointer shadow-sm">
+          <button type="button" onClick={() => setIsDrawerOpen(false)} className="w-9 h-9 bg-white border border-slate-200 rounded-full flex items-center justify-center text-slate-400 hover:text-red-500 cursor-pointer shadow-sm">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -604,14 +659,14 @@ export default function AdminDashboard() {
           <section className="space-y-3">
             <div className="border-b border-slate-100 pb-2">
               <h3 className="text-xs font-black uppercase tracking-widest text-slate-800">Ubah Harga (Quick Sync)</h3>
-              <p className="text-[10px] font-bold text-slate-400">Harga langsung terganti di Layar Kasir POS</p>
+              <p className="text-[10px] font-bold text-slate-400">Harga langsung terganti di Layar Kasir POS & Self-Order</p>
             </div>
 
             <div className="space-y-3">
               <div className="flex items-center justify-between bg-slate-50 border border-slate-200 p-3.5 rounded-2xl">
                 <div>
                   <h4 className="text-xs font-black text-slate-800">Porsi Kecil (5 pcs)</h4>
-                  <span className="text-[10px] text-slate-400 font-bold">Menu Standar</span>
+                  <span className="text-[10px] text-slate-400 font-bold">Menu Camilan</span>
                 </div>
                 <div className="relative w-28">
                   <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">Rp</span>
@@ -646,7 +701,7 @@ export default function AdminDashboard() {
           <section className="space-y-4">
             <div className="border-b border-slate-100 pb-2">
               <h3 className="text-xs font-black uppercase tracking-widest text-slate-800">Kelola Bahan Topping</h3>
-              <p className="text-[10px] font-bold text-slate-400">Klik status untuk mengubah persediaan</p>
+              <p className="text-[10px] font-bold text-slate-400">Status bahan langsung tersinkron ke opsi pelanggan</p>
             </div>
 
             <div className="flex gap-2">

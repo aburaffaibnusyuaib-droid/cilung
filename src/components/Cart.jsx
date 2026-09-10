@@ -55,63 +55,32 @@ export default function Cart({
     return map[id] || id;
   };
 
-  // FUNGSI RAKIT PESAN WA
-  const generateWAUrl = (isQris) => {
-    const targetPhone = '628567637987';
-    let message = `🐙 *PESANAN TAKOYAKI SIBOY (SELF-PICKUP)* 🐙\n`;
-    message += `------------------------------------------\n`;
-    message += `👤 *Nama Pemesan:* ${nama.trim()}\n`;
-    if (catatanGlobal.trim()) {
-      message += `📝 *Catatan Tambahan:* ${catatanGlobal.trim()}\n`;
-    }
-    message += `------------------------------------------\n`;
-    message += `📋 *RINCIAN PESANAN:*\n\n`;
-
-    cartItems.forEach((item, index) => {
-      const toppingsText = item.toppings && item.toppings.length > 0 
-        ? item.toppings.map(t => getToppingLabel(t)).join(', ') 
-        : 'Tanpa Topping (Polos)';
-      
-      const sausText = item.saus && item.saus.length > 0
-        ? item.saus.map(s => getSausLabel(s)).join(' + ')
-        : 'Tanpa Saus';
-      
-      message += `${index + 1}. *${item.quantity}x ${item.name}* (${item.pcs || 'Porsi'})\n`;
-      message += `   • Isian/Topping: ${toppingsText}\n`;
-      message += `   • Sayur: ${item.sayur || 'Pakai Sayur'}\n`;
-      message += `   • Saus: ${sausText}\n`;
-      if (item.catatan && item.catatan.trim()) {
-        message += `   • Catatan Item: "${item.catatan.trim()}"\n`;
-      }
-      message += `   • Subtotal: Rp ${(item.totalPrice || 0).toLocaleString('id-ID')}\n\n`;
-    });
-
-    message += `------------------------------------------\n`;
-    message += `💰 *TOTAL BAYAR:* Rp ${subtotal.toLocaleString('id-ID')}\n`;
-    
-    if (isQris) {
-      message += `💳 *Pembayaran:* QRIS (Bukti transfer dilampirkan)\n\n`;
-    } else {
-      message += `💳 *Pembayaran:* Tunai / Bayar di Gerobak\n\n`;
-    }
-    
-    message += `_Mohon diproses ya bang, saya langsung ambil ke kedai!_ 🚀`;
-
-    return `https://wa.me/${targetPhone}?text=${encodeURIComponent(message)}`;
-  };
-
   const handleCashClick = () => {
     if (!isOpenStore) return;
-    if (!nama.trim()) { setErrorNama(true); return; }
+    if (!nama.trim()) { 
+      setErrorNama(true); 
+      return; 
+    }
     setErrorNama(false);
-    onCheckoutCash(generateWAUrl(false));
+    onCheckoutCash({
+      customerName: nama.trim(),
+      notes: catatanGlobal.trim(),
+      paymentMethod: 'CASH'
+    });
   };
 
   const handleQrisClick = () => {
     if (!isOpenStore) return;
-    if (!nama.trim()) { setErrorNama(true); return; }
+    if (!nama.trim()) { 
+      setErrorNama(true); 
+      return; 
+    }
     setErrorNama(false);
-    onCheckoutQris(generateWAUrl(true));
+    onCheckoutQris({
+      customerName: nama.trim(),
+      notes: catatanGlobal.trim(),
+      paymentMethod: 'QRIS'
+    });
   };
 
   return (
@@ -152,6 +121,7 @@ export default function Cart({
           </div>
 
           <button
+            type="button"
             onClick={onClose}
             className="group w-8 h-8 rounded-full bg-slate-100 hover:bg-red-600 text-slate-500 hover:text-white flex items-center justify-center transition-all duration-200 shrink-0 active:scale-90 shadow-sm border border-slate-200/80 hover:border-red-600 cursor-pointer"
           >
@@ -162,16 +132,16 @@ export default function Cart({
         {/* BODY DRAWER */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 scrollbar-hide">
           
-          {/* BANNER NOTIFIKASI TUTUP JIKA TOKO OFFLINE */}
+          {/* BANNER NOTIFIKASI TUTUP */}
           {!isOpenStore && (
             <div className="bg-rose-50 border border-rose-200 p-3.5 rounded-2xl flex items-center gap-3 text-rose-800 shadow-sm animate-in fade-in">
               <Store className="w-5 h-5 text-rose-600 shrink-0" />
               <div className="text-xs">
                 <p className="font-black uppercase tracking-wider text-[11px]" style={{ fontFamily: "'Montserrat', sans-serif" }}>
-                  Toko Baru Saja Tutup
+                  Toko Sedang Tutup
                 </p>
                 <p className="text-[11px] text-rose-700/90 mt-0.5 font-semibold leading-tight">
-                  Pemesanan sementara tidak dapat diproses hingga toko kembali buka.
+                  Pemesanan sementara dikunci sampai outlet kembali dibuka.
                 </p>
               </div>
             </div>
@@ -186,10 +156,10 @@ export default function Cart({
                 className="font-black uppercase tracking-wide text-[11px]"
                 style={{ fontFamily: "'Montserrat', sans-serif" }}
               >
-                SELF-PICKUP (AMBIL SENDIRI)
+                SELF-PICKUP DI OUTLET
               </p>
               <p className="text-[11px] text-amber-800/90 mt-0.5 font-semibold leading-relaxed">
-                Pesanan diracik langsung dari wajan panggang. Kirim via WA, lalu langsung ambil ke kedai!
+                Pilih metode pembayaran di bawah. Karcis antrean otomatis terbit untuk konfirmasi di kasir.
               </p>
             </div>
           </div>
@@ -201,6 +171,7 @@ export default function Cart({
               </div>
               <p className="text-sm font-extrabold text-slate-600">Keranjang kamu masih kosong</p>
               <button 
+                type="button"
                 onClick={onClose}
                 className="inline-flex items-center gap-1.5 text-xs font-black text-red-600 hover:text-red-700 uppercase tracking-wider bg-red-50 hover:bg-red-100 px-4 py-2 rounded-xl transition-all cursor-pointer"
                 style={{ fontFamily: "'Montserrat', sans-serif" }}
@@ -233,15 +204,17 @@ export default function Cart({
 
                     <div className="flex items-center gap-1">
                       <button
+                        type="button"
                         onClick={() => onEditItem(index)}
                         className="flex items-center gap-1 text-[10px] font-black text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 px-2.5 py-1 rounded-lg transition-all active:scale-95 group/edit cursor-pointer"
-                        title="Edit Pilihan Topping & Saus"
+                        title="Edit Topping & Saus"
                       >
                         <Pencil className="w-3 h-3 text-amber-600 group-hover/edit:rotate-12 transition-transform" />
                         <span>EDIT</span>
                       </button>
 
                       <button
+                        type="button"
                         onClick={() => onRemoveItem(index)}
                         className="text-slate-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-all active:scale-90 cursor-pointer"
                         title="Hapus Menu"
@@ -290,6 +263,7 @@ export default function Cart({
                     <span className="text-[11px] font-bold text-slate-400">Porsi:</span>
                     <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-xl border border-slate-200 shadow-inner">
                       <button
+                        type="button"
                         onClick={() => onUpdateQuantity(index, item.quantity - 1)}
                         disabled={item.quantity <= 1 || !isOpenStore}
                         className="w-6 h-6 rounded-lg bg-white hover:bg-slate-200 flex items-center justify-center text-slate-700 active:scale-90 transition-all shadow-sm cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
@@ -303,6 +277,7 @@ export default function Cart({
                         {item.quantity}
                       </span>
                       <button
+                        type="button"
                         onClick={() => onUpdateQuantity(index, item.quantity + 1)}
                         disabled={!isOpenStore}
                         className="w-6 h-6 rounded-lg bg-red-600 hover:bg-red-700 disabled:bg-slate-300 flex items-center justify-center text-white active:scale-90 transition-all shadow-sm cursor-pointer disabled:cursor-not-allowed"
@@ -335,14 +310,14 @@ export default function Cart({
                     setNama(e.target.value);
                     if (e.target.value.trim()) setErrorNama(false);
                   }}
-                  placeholder={isOpenStore ? "Ketik nama kamu di sini..." : "Toko sedang tutup"}
+                  placeholder={isOpenStore ? "Ketik nama panggilanmu di sini..." : "Toko sedang tutup"}
                   className={`w-full bg-slate-50 border ${
                     errorNama ? 'border-red-500 ring-2 ring-red-500/20' : 'border-slate-200'
                   } rounded-2xl p-3 text-xs text-slate-800 focus:outline-none focus:border-red-500 focus:bg-white transition-all disabled:opacity-60 disabled:cursor-not-allowed`}
                 />
                 {errorNama && (
                   <p className="text-[10px] text-red-500 font-bold mt-1 flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" /> Isi nama dulu ya biar abang tahu siapa pemesannya!
+                    <AlertCircle className="w-3 h-3" /> Masukkan nama pemesan terlebih dahulu!
                   </p>
                 )}
               </div>
@@ -350,14 +325,14 @@ export default function Cart({
               <div>
                 <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5 mb-1">
                   <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Catatan Tambahan Pesanan (Opsional)</span>
+                  <span>Catatan Tambahan (Opsional)</span>
                 </label>
                 <input
                   type="text"
                   disabled={!isOpenStore}
                   value={catatanGlobal}
                   onChange={(e) => setCatatanGlobal(e.target.value)}
-                  placeholder="Contoh: Saus dipisah, ambil jam 18.30..."
+                  placeholder="Contoh: Saus dipisah, tidak pakai katsuobushi..."
                   className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-xs text-slate-800 focus:outline-none focus:border-red-500 focus:bg-white transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                 />
               </div>
@@ -369,7 +344,7 @@ export default function Cart({
         {cartItems.length > 0 && (
           <div className="p-4 bg-white border-t border-slate-100 space-y-3 shrink-0 shadow-[0_-10px_20px_rgba(0,0,0,0.03)]">
             <div className="flex items-center justify-between text-xs font-bold text-slate-500">
-              <span>Total Pembayaran:</span>
+              <span>Total Tagihan:</span>
               <span 
                 className={`text-xl font-black ${isOpenStore ? 'text-red-600' : 'text-slate-400'}`}
                 style={{ fontFamily: "'Montserrat', sans-serif" }}
@@ -408,7 +383,7 @@ export default function Cart({
                 style={{ fontFamily: "'Montserrat', sans-serif" }}
               >
                 <Store className="w-4 h-4 text-slate-400" />
-                <span>TOKO SEDANG TUTUP (CHECKOUT DIKUNCI)</span>
+                <span>OUTLET SEDANG TUTUP</span>
               </button>
             )}
           </div>

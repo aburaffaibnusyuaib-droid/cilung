@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import Hero from '@/components/Hero';
 import Menu from '@/components/Menu'; 
@@ -10,6 +11,7 @@ import Cart from '@/components/Cart';
 import Qris from '@/components/Qris'; 
 
 export default function Home() {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -17,18 +19,14 @@ export default function Home() {
   const [cartItems, setCartItems] = useState([]);
   const [editingIndex, setEditingIndex] = useState(null);
   
-  // STATE QRIS DAN PENYIMPANAN LINK WA
   const [isQrisOpen, setIsQrisOpen] = useState(false);
-  const [waUrl, setWaUrl] = useState('');
+  const [pendingOrderInfo, setPendingOrderInfo] = useState(null);
 
-  // Sinkronisasi status buka/tutup toko terpusat
   useEffect(() => {
     const checkStoreStatus = () => {
       try {
         const saved = localStorage.getItem('siboy_store_status');
-        if (saved !== null) {
-          setIsOpen(JSON.parse(saved));
-        }
+        if (saved !== null) setIsOpen(JSON.parse(saved));
       } catch (e) {}
     };
 
@@ -61,7 +59,7 @@ export default function Home() {
   };
 
   const handleAddToCart = (orderData) => {
-    if (!isOpen) return; // Guard clause pencegahan order saat toko tutup
+    if (!isOpen) return;
 
     if (editingIndex !== null) {
       setCartItems((prev) => {
@@ -70,11 +68,10 @@ export default function Home() {
         return updated;
       });
       setEditingIndex(null);
-      setIsCartOpen(true);
     } else {
       setCartItems((prev) => [...prev, orderData]);
-      setIsCartOpen(true);
     }
+    setIsCartOpen(true);
     setIsModalOpen(false);
   };
 
@@ -94,6 +91,58 @@ export default function Home() {
 
   const handleClearCart = () => {
     setCartItems([]);
+  };
+
+  // Helper Pembuatan Order & Karcis Otomatis
+  const processCheckout = (orderMeta) => {
+    try {
+      const history = JSON.parse(localStorage.getItem('siboy_order_history') || '[]');
+      const kitchen = JSON.parse(localStorage.getItem('siboy_kitchen_orders') || '[]');
+
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
+      
+      const qIndex = (history.length % 99) + 1;
+      const qNo = `#${qIndex.toString().padStart(2, '0')}`;
+      const orderId = `SB-${Date.now().toString().slice(-4)}`;
+
+      const formattedItems = cartItems.map(item => ({
+        name: item.name,
+        qty: item.quantity,
+        price: item.unitPrice,
+        toppings: item.toppings?.join(', ') || 'Polos',
+        veg: item.sayur || 'Pakai Sayur',
+        spicy: item.saus?.join(' + ') || 'Tanpa Saus'
+      }));
+
+      const newOrder = {
+        id: orderId,
+        qNo,
+        name: orderMeta.customerName,
+        customerName: orderMeta.customerName,
+        time: timeStr,
+        timestamp: now.toISOString(),
+        rawTotal: cartTotal,
+        total: `Rp ${cartTotal.toLocaleString('id-ID')}`,
+        pay: orderMeta.paymentMethod,
+        status: 'waiting_verification', // Menunggu validasi kasir
+        notes: orderMeta.notes || '',
+        items: formattedItems
+      };
+
+      // Simpan ke storage untuk kasir & dapur
+      localStorage.setItem('siboy_order_history', JSON.stringify([newOrder, ...history]));
+      localStorage.setItem('siboy_kitchen_orders', JSON.stringify([...kitchen, newOrder]));
+      window.dispatchEvent(new Event('storage'));
+
+      // Bersihkan keranjang dan buka halaman tiket
+      handleClearCart();
+      setIsCartOpen(false);
+      setIsQrisOpen(false);
+      router.push(`/ticket?id=${orderId}`);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   return (
@@ -141,11 +190,8 @@ export default function Home() {
         isOpen={isQrisOpen}
         onClose={() => setIsQrisOpen(false)}
         totalPrice={cartTotal}
-        onProceedWA={() => {
-          if (waUrl) window.open(waUrl, '_blank');
-          handleClearCart();
-          setIsCartOpen(false);
-          setIsQrisOpen(false);
+        onConfirmPayment={() => {
+          if (pendingOrderInfo) processCheckout(pendingOrderInfo);
         }} 
       />
 
@@ -159,15 +205,9 @@ export default function Home() {
         onRemoveItem={handleRemoveItem}
         onEditItem={handleEditItem}
         onClearCart={handleClearCart}
-        onCheckoutCash={(url) => {
-          if (!isOpen) return;
-          window.open(url, '_blank');
-          handleClearCart();
-          setIsCartOpen(false);
-        }}
-        onCheckoutQris={(url) => {
-          if (!isOpen) return;
-          setWaUrl(url);
+        onCheckoutCash={(info) => processCheckout(info)}
+        onCheckoutQris={(info) => {
+          setPendingOrderInfo(info);
           setIsQrisOpen(true);
         }}
       />

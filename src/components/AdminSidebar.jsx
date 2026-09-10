@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { 
   X, Store, LayoutDashboard, ChefHat, ClipboardList, 
@@ -11,6 +11,53 @@ export default function AdminSidebar({ isOpen, setIsOpen, onOpenSettings }) {
   const router = useRouter();
   const pathname = usePathname();
 
+  // State untuk menghitung badge dinamis
+  const [kitchenStats, setKitchenStats] = useState({
+    waiting: 0,
+    cooking: 0,
+    totalActive: 0
+  });
+
+  // Baca data localStorage secara real-time
+  useEffect(() => {
+    const syncKitchenData = () => {
+      try {
+        const rawData = localStorage.getItem('siboy_kitchen_orders');
+        if (!rawData) {
+          setKitchenStats({ waiting: 0, cooking: 0, totalActive: 0 });
+          return;
+        }
+
+        const orders = JSON.parse(rawData);
+        if (Array.isArray(orders)) {
+          const waiting = orders.filter(o => o.status === 'waiting_verification').length;
+          const pending = orders.filter(o => o.status === 'pending').length;
+          const cooking = orders.filter(o => o.status === 'cooking').length;
+
+          setKitchenStats({
+            waiting,
+            cooking,
+            totalActive: waiting + pending + cooking
+          });
+        }
+      } catch (err) {
+        setKitchenStats({ waiting: 0, cooking: 0, totalActive: 0 });
+      }
+    };
+
+    syncKitchenData();
+
+    // Listener saat KitchenView update data lewat storage event
+    window.addEventListener('storage', syncKitchenData);
+    // Interval fallback agar angka selalu sinkron antar-tab/komponen
+    const interval = setInterval(syncKitchenData, 1000);
+
+    return () => {
+      window.removeEventListener('storage', syncKitchenData);
+      clearInterval(interval);
+    };
+  }, []);
+
   const handleLogout = () => {
     localStorage.removeItem('admin_auth');
     router.push('/');
@@ -18,7 +65,6 @@ export default function AdminSidebar({ isOpen, setIsOpen, onOpenSettings }) {
 
   if (!isOpen) return null;
 
-  // Header Brand Dinamis sesuai Halaman Aktif
   const getHeaderTheme = () => {
     if (pathname.startsWith('/admin/kitchen')) {
       return {
@@ -52,13 +98,11 @@ export default function AdminSidebar({ isOpen, setIsOpen, onOpenSettings }) {
 
   return (
     <div className="fixed inset-0 z-[100] flex">
-      {/* 1. Backdrop Blur Luar: Klik di area blur otomatis close */}
       <div 
         className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity cursor-pointer" 
         onClick={() => setIsOpen(false)} 
       />
 
-      {/* 2. Sidebar Drawer Panel */}
       <div className={`relative w-[280px] max-w-[85vw] bg-[#fdfcf9] h-full shadow-2xl z-10 transform transition-transform duration-300 ease-out flex flex-col border-r border-slate-200 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         
         {/* Brand Header Dinamis */}
@@ -89,7 +133,7 @@ export default function AdminSidebar({ isOpen, setIsOpen, onOpenSettings }) {
         <div className="flex-1 overflow-y-auto py-6 px-4 space-y-2">
           <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-3 mb-3">Navigasi Utama</p>
           
-          {/* 1. Dashboard -> MERAH */}
+          {/* 1. Dashboard */}
           <button 
             type="button"
             onClick={() => { setIsOpen(false); router.push('/admin'); }} 
@@ -103,7 +147,7 @@ export default function AdminSidebar({ isOpen, setIsOpen, onOpenSettings }) {
             Dashboard
           </button>
 
-          {/* 2. Kasir (POS) -> DARK SLATE / BUKAN MERAH */}
+          {/* 2. Kasir (POS) */}
           <button 
             type="button"
             onClick={() => { setIsOpen(false); router.push('/admin/pos'); }} 
@@ -117,7 +161,7 @@ export default function AdminSidebar({ isOpen, setIsOpen, onOpenSettings }) {
             Kasir (POS)
           </button>
           
-          {/* 3. Kitchen View -> KUNING / AMBER */}
+          {/* 3. Kitchen View - DINAMIS BADGE */}
           <button 
             type="button"
             onClick={() => { setIsOpen(false); router.push('/admin/kitchen'); }} 
@@ -131,16 +175,27 @@ export default function AdminSidebar({ isOpen, setIsOpen, onOpenSettings }) {
               <ChefHat className={`w-5 h-5 ${pathname.startsWith('/admin/kitchen') ? 'text-white' : 'text-slate-400 group-hover:text-amber-500'} transition-colors`} /> 
               Kitchen View
             </div>
-            <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg border transition-colors ${
-              pathname.startsWith('/admin/kitchen')
-                ? 'bg-white text-amber-900 border-white/50 shadow-sm'
-                : 'bg-amber-50 text-amber-700 border-amber-200'
-            }`}>
-              4 Antre
-            </span>
+
+            {/* Render Badge hanya jika totalActive > 0 */}
+            {kitchenStats.totalActive > 0 && (
+              <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg border transition-all flex items-center gap-1.5 ${
+                pathname.startsWith('/admin/kitchen')
+                  ? 'bg-white text-amber-900 border-white/50 shadow-sm'
+                  : kitchenStats.waiting > 0
+                    ? 'bg-amber-500 text-white border-amber-600 shadow-sm animate-pulse'
+                    : 'bg-amber-100 text-amber-800 border-amber-200'
+              }`}>
+                {kitchenStats.waiting > 0 && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping inline-block" />
+                )}
+                {kitchenStats.waiting > 0 
+                  ? `${kitchenStats.waiting} Perlu Verif` 
+                  : `${kitchenStats.totalActive} Antre`}
+              </span>
+            )}
           </button>
 
-          {/* 4. Order History -> INDIGO */}
+          {/* 4. Order History */}
           <button 
             type="button"
             onClick={() => { setIsOpen(false); router.push('/admin/orders'); }} 
