@@ -68,7 +68,7 @@ export default function AdminSidebar({ isOpen, setIsOpen, onOpenSettings }) {
   const getHeaderTheme = () => {
     if (pathname.startsWith('/admin/kitchen')) {
       return {
-        box: 'bg-amber-500 text-white border-amber-600 shadow-amber-500/30',
+        box: 'bg-amber-500 text-white border-amber-500 shadow-amber-500/30',
         badge: 'KDS DAPUR AKTIF',
         icon: <ChefHat className="w-5 h-5" />
       };

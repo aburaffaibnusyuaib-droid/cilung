@@ -36,7 +36,7 @@ const CrabIcon = ({ className = 'w-4 h-4' }) => (
 );
 
 const CheeseWedgeIcon = ({ className = 'w-4.5 h-4.5' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M3 18h18L18 8 3 13v5z" />
     <path d="M3 13l15-5" />
     <circle cx="8" cy="15.5" r="1" fill="currentColor" />
@@ -67,7 +67,14 @@ const MayoSwirlIcon = ({ className = 'w-4 h-4' }) => (
   </svg>
 );
 
-/* ================= COMPONENT ================= */
+const DEFAULT_TOPPINGS = [
+  { id: 1, name: 'Katsuobushi', status: 'Aman' },
+  { id: 2, name: 'Keju Mozza', status: 'Aman' },
+  { id: 3, name: 'Sosis Ayam', status: 'Menipis' },
+  { id: 4, name: 'Crabstick', status: 'Aman' },
+  { id: 5, name: 'Kornet Gurih', status: 'Habis' }
+];
+
 export default function MenuModal({ product, onClose, onAddToCart, isOpenStore = true }) {
   if (!product) return null;
 
@@ -78,6 +85,26 @@ export default function MenuModal({ product, onClose, onAddToCart, isOpenStore =
   );
   const [selectedSaus, setSelectedSaus] = useState(product.saus || ['pedas', 'mayones']);
   const [catatan, setCatatan] = useState(product.catatan || '');
+  const [toppingsStock, setToppingsStock] = useState(DEFAULT_TOPPINGS);
+
+  // SINKRONISASI STOK TOPPING DARI DASHBOARD ADMIN
+  useEffect(() => {
+    const syncStock = () => {
+      try {
+        const saved = localStorage.getItem('siboy_toppings');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setToppingsStock(parsed);
+          }
+        }
+      } catch (e) {}
+    };
+
+    syncStock();
+    window.addEventListener('storage', syncStock);
+    return () => window.removeEventListener('storage', syncStock);
+  }, []);
 
   useEffect(() => {
     if (product) {
@@ -96,50 +123,15 @@ export default function MenuModal({ product, onClose, onAddToCart, isOpenStore =
     if (e.target === e.currentTarget) onClose();
   };
 
-  const toppingOptions = [
-    { 
-      id: 'sosis', 
-      label: 'Sosis', 
-      icon: <SausageHorizontalIcon className="w-4 h-4 text-orange-500" />,
-      activeStyle: 'border-orange-500 text-orange-800 bg-orange-50',
-      checkStyle: 'bg-orange-500'
-    },
-    { 
-      id: 'kornet', 
-      label: 'Kornet', 
-      icon: <BeefSteakIcon className="w-4 h-4 text-rose-700" />,
-      activeStyle: 'border-rose-700 text-rose-900 bg-rose-50',
-      checkStyle: 'bg-rose-700'
-    },
-    { 
-      id: 'crabstick', 
-      label: 'Crabstick', 
-      icon: <CrabIcon className="w-4 h-4 text-red-500" />,
-      activeStyle: 'border-red-500 text-red-700 bg-red-50',
-      checkStyle: 'bg-red-500'
-    },
-    { 
-      id: 'keju', 
-      label: 'Keju', 
-      icon: <CheeseWedgeIcon className="w-4.5 h-4.5 text-amber-500" />,
-      activeStyle: 'border-amber-500 text-amber-800 bg-amber-50',
-      checkStyle: 'bg-amber-500'
-    },
-    { 
-      id: 'cakalang', 
-      label: 'Katsuobushi', 
-      icon: <KatsuobushiIcon className="w-4 h-4 text-yellow-700" />,
-      activeStyle: 'border-yellow-700 text-yellow-900 bg-yellow-100/50',
-      checkStyle: 'bg-yellow-700'
-    },
-    { 
-      id: 'polos', 
-      label: 'Tanpa Topping', 
-      icon: <Ban className="w-4 h-4 text-slate-400 stroke-[2.2]" />,
-      activeStyle: 'border-slate-400 text-slate-600 bg-slate-50',
-      checkStyle: 'bg-slate-500'
-    },
-  ];
+  const getToppingIcon = (name) => {
+    const n = name.toLowerCase();
+    if (n.includes('sosis')) return <SausageHorizontalIcon className="w-4 h-4 text-orange-500" />;
+    if (n.includes('kornet') || n.includes('daging')) return <BeefSteakIcon className="w-4 h-4 text-rose-700" />;
+    if (n.includes('crab')) return <CrabIcon className="w-4 h-4 text-red-500" />;
+    if (n.includes('keju') || n.includes('mozza')) return <CheeseWedgeIcon className="w-4.5 h-4.5 text-amber-500" />;
+    if (n.includes('katsuobushi') || n.includes('cakalang')) return <KatsuobushiIcon className="w-4 h-4 text-yellow-700" />;
+    return <Flame className="w-4 h-4 text-amber-500" />;
+  };
 
   const sausOptions = [
     { 
@@ -172,16 +164,16 @@ export default function MenuModal({ product, onClose, onAddToCart, isOpenStore =
     },
   ];
 
-  const handleToggleTopping = (id) => {
-    if (id === 'polos') {
-      setSelectedToppings(['polos']);
+  const handleToggleTopping = (name) => {
+    if (name === 'polos' || name === 'Tanpa Topping') {
+      setSelectedToppings(['Tanpa Topping']);
       return;
     }
-    let updated = selectedToppings.filter((item) => item !== 'polos');
-    if (updated.includes(id)) {
-      updated = updated.filter((item) => item !== id);
+    let updated = selectedToppings.filter((item) => item !== 'polos' && item !== 'Tanpa Topping');
+    if (updated.includes(name)) {
+      updated = updated.filter((item) => item !== name);
     } else {
-      updated.push(id);
+      updated.push(name);
     }
     setSelectedToppings(updated);
   };
@@ -208,7 +200,7 @@ export default function MenuModal({ product, onClose, onAddToCart, isOpenStore =
       quantity,
       unitPrice,
       totalPrice,
-      toppings: selectedToppings.length > 0 ? selectedToppings : ['polos'],
+      toppings: selectedToppings.length > 0 ? selectedToppings : ['Tanpa Topping'],
       sayur: pakaiSayur ? 'Pakai Sayur (Kol & Daun Bawang)' : 'Tanpa Sayur',
       saus: selectedSaus.length > 0 ? selectedSaus : ['tanpasaus'],
       catatan,
@@ -268,7 +260,7 @@ export default function MenuModal({ product, onClose, onAddToCart, isOpenStore =
         {/* Body Content */}
         <div className="p-4 sm:p-6 overflow-y-auto space-y-7 scrollbar-hide bg-[#fcfcfc]">
           
-          {/* Section 1: Topping */}
+          {/* Section 1: Topping Dinamis Tersinkron ke Dashboard */}
           <div className="space-y-3.5">
             <div className="flex items-center justify-between px-1">
               <label className="text-sm font-black uppercase text-slate-900 tracking-wider" style={{ fontFamily: "'Montserrat', sans-serif" }}>
@@ -278,36 +270,72 @@ export default function MenuModal({ product, onClose, onAddToCart, isOpenStore =
             </div>
 
             <div className="grid grid-cols-2 gap-2.5">
-              {toppingOptions.map((topping) => {
-                const isSelected = selectedToppings.includes(topping.id);
+              {toppingsStock.map((topping) => {
+                const isHabis = topping.status === 'Habis';
+                const isSelected = selectedToppings.includes(topping.name);
 
                 return (
                   <button
                     key={topping.id}
-                    onClick={() => handleToggleTopping(topping.id)}
+                    disabled={isHabis || !isOpenStore}
+                    onClick={() => handleToggleTopping(topping.name)}
                     type="button"
-                    className={`group py-2.5 px-3.5 rounded-full border transition-all duration-200 flex items-center justify-between text-left active:scale-[0.98] cursor-pointer ${
-                      isSelected
-                        ? `${topping.activeStyle} shadow-sm`
-                        : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 shadow-sm shadow-slate-100/50'
+                    className={`group py-2.5 px-3.5 rounded-full border transition-all duration-200 flex items-center justify-between text-left active:scale-[0.98] ${
+                      isHabis 
+                        ? 'bg-slate-100 border-slate-200 text-slate-400 opacity-50 cursor-not-allowed'
+                        : isSelected
+                          ? 'border-amber-500 text-amber-900 bg-amber-50 shadow-sm cursor-pointer'
+                          : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 shadow-sm cursor-pointer'
                     }`}
                   >
-                    <div className="flex items-center gap-2.5">
-                      <div className="flex items-center justify-center w-6 h-6">
-                        {topping.icon}
+                    <div className="flex items-center gap-2.5 min-w-0 pr-1">
+                      <div className="flex items-center justify-center w-6 h-6 shrink-0">
+                        {getToppingIcon(topping.name)}
                       </div>
-                      <span className={`font-serif text-[13px] ${isSelected ? 'font-black' : 'font-bold'}`}>
-                        {topping.label}
-                      </span>
+                      <div className="truncate">
+                        <span className={`font-serif text-[13px] block truncate ${isSelected ? 'font-black' : 'font-bold'} ${isHabis ? 'line-through' : ''}`}>
+                          {topping.name}
+                        </span>
+                        {topping.status === 'Menipis' && (
+                          <span className="text-[8px] font-black uppercase text-amber-600 tracking-widest block leading-none">Menipis</span>
+                        )}
+                        {isHabis && (
+                          <span className="text-[8px] font-black uppercase text-red-500 tracking-widest block leading-none">Habis</span>
+                        )}
+                      </div>
                     </div>
-                    {isSelected && (
-                      <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 shadow-inner ${topping.checkStyle}`}>
+                    {isSelected && !isHabis && (
+                      <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0 shadow-inner bg-amber-500">
                         <Check className="w-2.5 h-2.5 text-white stroke-[3.5]" />
                       </div>
                     )}
                   </button>
                 );
               })}
+
+              {/* Pilihan Polos / Tanpa Topping */}
+              <button
+                type="button"
+                disabled={!isOpenStore}
+                onClick={() => handleToggleTopping('Tanpa Topping')}
+                className={`group py-2.5 px-3.5 rounded-full border transition-all duration-200 flex items-center justify-between text-left active:scale-[0.98] cursor-pointer ${
+                  selectedToppings.includes('Tanpa Topping') || selectedToppings.includes('polos')
+                    ? 'border-slate-400 text-slate-700 bg-slate-100 shadow-sm'
+                    : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 shadow-sm'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="flex items-center justify-center w-6 h-6">
+                    <Ban className="w-4 h-4 text-slate-400 stroke-[2.2]" />
+                  </div>
+                  <span className="font-serif text-[13px] font-bold">Tanpa Topping</span>
+                </div>
+                {(selectedToppings.includes('Tanpa Topping') || selectedToppings.includes('polos')) && (
+                  <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0 shadow-inner bg-slate-500">
+                    <Check className="w-2.5 h-2.5 text-white stroke-[3.5]" />
+                  </div>
+                )}
+              </button>
             </div>
           </div>
 

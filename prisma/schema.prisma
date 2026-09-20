@@ -1,0 +1,52 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DIRECT_URL")
+}
+
+// 1. Tabel Menu & Harga
+model Menu {
+  id          String   @id @default(uuid())
+  slug        String   @unique
+  name        String
+  pcs         String
+  price       Int
+  image       String   @default("/produk.jpg")
+  badge       String?
+  isAvailable Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// 2. Tabel Pesanan Masuk
+model Order {
+  id            String      @id @default(uuid())
+  customerName  String
+  customerPhone String
+  totalPrice    Int
+  status        String      @default("MENUNGGU")
+  notes         String?
+  items         OrderItem[]
+  createdAt     DateTime    @default(now())
+}
+
+// 3. Detail Item dalam Pesanan
+model OrderItem {
+  id        String @id @default(uuid())
+  orderId   String
+  menuName  String
+  quantity  Int
+  price     Int
+  order     Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+// 4. Autentikasi Admin
+model Admin {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String
+  createdAt DateTime @default(now())
+}

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Bell, BellOff, Flame, CheckCircle2, RotateCcw, Clock, Menu,
-  Hourglass, Check, X, ShieldAlert, Sparkles, ChefHat
+  Hourglass, Check, X, ChefHat
 } from 'lucide-react';
 
 import AdminSidebar from '@/components/AdminSidebar';
@@ -13,7 +13,6 @@ export default function KitchenView() {
   const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
-  const [isMounted, setIsMounted] = useState(false);
   
   // Tab Switcher untuk Mobile
   const [mobileTab, setMobileTab] = useState('waiting'); // 'waiting' | 'pending' | 'cooking'
@@ -24,6 +23,7 @@ export default function KitchenView() {
 
   const prevWaitingCountRef = useRef(0);
 
+  // Notifikasi Suara Web Audio API
   const playAlertSound = () => {
     if (!isSoundEnabled) return;
     try {
@@ -42,95 +42,138 @@ export default function KitchenView() {
     } catch (e) {}
   };
 
-  useEffect(() => {
-    setIsMounted(true);
-    const auth = localStorage.getItem('admin_auth');
-    if (!auth) router.push('/admin/login');
+  // Format payload database Supabase ke format tiket dapur
+  const formatDbToKitchen = (dbOrders) => {
+    return dbOrders.map((o) => {
+      const rawStatus = (o.status || '').toLowerCase();
+      let mappedStatus = 'waiting_verification';
 
-    const loadOrders = () => {
+      if (rawStatus === 'pending' || rawStatus === 'diproses') {
+        mappedStatus = 'pending';
+      } else if (rawStatus === 'cooking' || rawStatus === 'dimasak') {
+        mappedStatus = 'cooking';
+      } else if (rawStatus === 'ready' || rawStatus === 'selesai' || rawStatus === 'siap') {
+        mappedStatus = 'ready';
+      } else if (rawStatus === 'waiting_verification' || rawStatus === 'waiting') {
+        mappedStatus = 'waiting_verification';
+      } else {
+        mappedStatus = 'pending';
+      }
+
+      const orderTime = o.createdAt
+        ? new Date(o.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+        : '-';
+
+      // Ekstrak nomor antrean harian [#01], [#02] jika ada di catatan/notes
+      let queueBadge = `#${o.id.slice(-3)}`;
+      const queueMatch = o.notes?.match(/\[#(.*?)\]/);
+      if (queueMatch) {
+        queueBadge = `#${queueMatch[1]}`;
+      } else if (o.id.startsWith('SB-')) {
+        const parts = o.id.split('-');
+        queueBadge = `#${parts[parts.length - 1]}`;
+      }
+
+      return {
+        id: o.id,
+        qNo: queueBadge,
+        time: orderTime,
+        status: mappedStatus,
+        customerName: o.customerName || 'Pelanggan',
+        notes: o.notes?.replace(/\[#(.*?)\]\s*/, '') || '',
+        total: `Rp ${(o.totalPrice || 0).toLocaleString('id-ID')}`,
+        pay: o.notes?.includes('QRIS') ? 'QRIS' : 'CASH',
+        items: o.items?.map((it) => ({
+          name: it.menuName,
+          qty: it.quantity,
+          price: it.price,
+          toppings: it.menuName.includes('(') ? it.menuName.split('(')[1]?.replace(')', '') : 'Polos',
+          veg: '',
+          spicy: ''
+        })) || []
+      };
+    });
+  };
+
+  // Mengambil data dari Supabase via API
+  const loadOrders = async () => {
+    try {
+      const res = await fetch('/api/orders');
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        const formatted = formatDbToKitchen(json.data);
+        
+        // Filter yang belum selesai
+        const activeOrders = formatted.filter(o => o.status !== 'ready');
+        setOrders(activeOrders);
+
+        // Suara alert bila ada order waiting baru
+        const waitingCount = activeOrders.filter(o => o.status === 'waiting_verification').length;
+        if (waitingCount > prevWaitingCountRef.current) {
+          playAlertSound();
+          setMobileTab('waiting');
+        }
+        prevWaitingCountRef.current = waitingCount;
+
+        // Sinkronisasi cadangan ke localStorage
+        localStorage.setItem('siboy_kitchen_orders', JSON.stringify(activeOrders));
+      }
+    } catch (e) {
+      // Fallback baca localStorage jika offline
       try {
         const saved = localStorage.getItem('siboy_kitchen_orders');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          setOrders(parsed);
+        if (saved) setOrders(JSON.parse(saved));
+      } catch (err) {}
+    }
+  };
 
-          const waitingCount = parsed.filter(o => o.status === 'waiting_verification').length;
-          if (waitingCount > prevWaitingCountRef.current) {
-            playAlertSound();
-            // Otomatis pindah tab ke waiting jika ada pesanan baru di mobile
-            setMobileTab('waiting');
-          }
-          prevWaitingCountRef.current = waitingCount;
-        } else {
-          setOrders([]);
-        }
-      } catch (e) {
-        setOrders([]);
-      }
-    };
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const auth = localStorage.getItem('admin_auth');
+      if (!auth) router.push('/admin/login');
+    }
 
     loadOrders();
-    window.addEventListener('storage', loadOrders);
-    const interval = setInterval(loadOrders, 1000);
+    const interval = setInterval(loadOrders, 3000); // Polling update database tiap 3 detik
 
-    return () => {
-      window.removeEventListener('storage', loadOrders);
-      clearInterval(interval);
-    };
+    return () => clearInterval(interval);
   }, [router, isSoundEnabled]);
 
-  const updateOrdersState = (newOrders) => {
-    setOrders(newOrders);
-    localStorage.setItem('siboy_kitchen_orders', JSON.stringify(newOrders));
-    
+  // Fungsi pembantu update status ke Supabase
+  const patchStatusToSupabase = async (orderId, newStatus) => {
     try {
-      const history = JSON.parse(localStorage.getItem('siboy_order_history') || '[]');
-      const updatedHistory = history.map(h => {
-        const match = newOrders.find(o => o.id === h.id);
-        return match ? { ...h, status: match.status } : h;
+      await fetch('/api/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: orderId, status: newStatus }),
       });
-      localStorage.setItem('siboy_order_history', JSON.stringify(updatedHistory));
-    } catch (e) {}
-
-    window.dispatchEvent(new Event('storage'));
+    } catch (e) {
+      console.error('Gagal update status ke Supabase:', e);
+    }
   };
 
   // 1. Verifikasi Masuk ke Antrean Siap Masak (Waiting -> Pending)
   const verifyToPending = (orderId) => {
-    const updated = orders.map(o => o.id === orderId ? { ...o, status: 'pending' } : o);
-    updateOrdersState(updated);
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'pending' } : o));
+    patchStatusToSupabase(orderId, 'pending');
   };
 
   // 2. Tolak Pesanan Fiktif
   const rejectOrder = (orderId) => {
-    const updated = orders.filter(o => o.id !== orderId);
-    updateOrdersState(updated);
-
-    try {
-      const history = JSON.parse(localStorage.getItem('siboy_order_history') || '[]');
-      const updatedHistory = history.filter(h => h.id !== orderId);
-      localStorage.setItem('siboy_order_history', JSON.stringify(updatedHistory));
-      window.dispatchEvent(new Event('storage'));
-    } catch (e) {}
+    setOrders(prev => prev.filter(o => o.id !== orderId));
+    patchStatusToSupabase(orderId, 'DIBATALKAN');
   };
 
   // 3. Masukkan ke Wajan (Pending -> Cooking)
-  const moveToCooking = (id) => {
-    const updated = orders.map(o => o.id === id ? { ...o, status: 'cooking' } : o);
-    updateOrdersState(updated);
+  const moveToCooking = (orderId) => {
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'cooking' } : o));
+    patchStatusToSupabase(orderId, 'cooking');
   };
 
   // 4. Selesai (Cooking -> Ready)
   const finishOrder = (order) => {
-    const updated = orders.filter(o => o.id !== order.id);
-    updateOrdersState(updated);
-    
-    try {
-      const history = JSON.parse(localStorage.getItem('siboy_order_history') || '[]');
-      const updatedHistory = history.map(h => h.id === order.id ? { ...h, status: 'ready' } : h);
-      localStorage.setItem('siboy_order_history', JSON.stringify(updatedHistory));
-      window.dispatchEvent(new Event('storage'));
-    } catch (e) {}
+    setOrders(prev => prev.filter(o => o.id !== order.id));
+    patchStatusToSupabase(order.id, 'SELESAI');
 
     setLastFinishedOrder(order);
     setToastMessage(`Pesanan ${order.qNo} (${order.customerName || order.name}) Selesai!`);
@@ -143,8 +186,9 @@ export default function KitchenView() {
 
   const undoFinish = () => {
     if (lastFinishedOrder) {
-      const restored = [...orders, { ...lastFinishedOrder, status: 'cooking' }].sort((a, b) => a.qNo.localeCompare(b.qNo));
-      updateOrdersState(restored);
+      const restored = [...orders, { ...lastFinishedOrder, status: 'cooking' }];
+      setOrders(restored);
+      patchStatusToSupabase(lastFinishedOrder.id, 'cooking');
       setToastMessage(null);
       setLastFinishedOrder(null);
     }
@@ -153,8 +197,6 @@ export default function KitchenView() {
   const waitingOrders = orders.filter(o => o.status === 'waiting_verification');
   const pendingOrders = orders.filter(o => o.status === 'pending');
   const cookingOrders = orders.filter(o => o.status === 'cooking');
-
-  if (!isMounted) return null;
 
   return (
     <div className="min-h-screen bg-[#faf9f6] text-slate-900 relative pb-24 overflow-x-hidden" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -169,13 +211,13 @@ export default function KitchenView() {
             <button 
               type="button"
               onClick={() => setIsSidebarOpen(true)} 
-              className="w-11 h-11 sm:w-12 sm:h-12 bg-white text-red-600 hover:bg-red-50 border-2 border-slate-100 hover:border-red-200 rounded-2xl transition-all flex items-center justify-center shadow-sm cursor-pointer active:scale-95"
+              className="w-11 h-11 sm:w-12 sm:h-12 bg-white text-amber-500 hover:bg-amber-50 border-2 border-slate-100 hover:border-amber-500 rounded-2xl transition-all flex items-center justify-center shadow-sm cursor-pointer active:scale-95"
             >
               <Menu className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.5]" />
             </button>
             <div>
               <h1 className="text-base sm:text-2xl font-black uppercase tracking-tight text-slate-800 leading-none" style={{ fontFamily: "'Montserrat', sans-serif" }}>
-                KITCHEN <span className="text-red-600">KDS</span>
+                KITCHEN <span className="text-amber-500">KDS</span>
               </h1>
               <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 mt-0.5">Sistem Monitor Alur Dapur</p>
             </div>
@@ -238,10 +280,10 @@ export default function KitchenView() {
           </button>
         </div>
 
-        {/* ================= 3 KOLOM UTAMA (DESKTOP GRID / MOBILE TAB ROUTED) ================= */}
+        {/* 3 KOLOM UTAMA */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6 items-start">
           
-          {/* KOLOM 1: VERIFIKASI KASIR (KUNING AMBER) */}
+          {/* KOLOM 1: VERIFIKASI KASIR */}
           <div className={`bg-amber-500/5 rounded-3xl p-3.5 sm:p-5 border-2 border-amber-300/80 min-h-[500px] ${
             mobileTab !== 'waiting' ? 'hidden lg:block' : 'block'
           }`}>
@@ -262,7 +304,7 @@ export default function KitchenView() {
               {waitingOrders.length === 0 && (
                 <div className="py-14 text-center">
                   <CheckCircle2 className="w-8 h-8 text-amber-300 mx-auto mb-2" />
-                  <p className="text-xs font-bold text-amber-700/70">Semua pesanan online sudah terverifikasi.</p>
+                  <p className="text-xs font-bold text-amber-700/70">Semua pesanan sudah terverifikasi.</p>
                 </div>
               )}
 
@@ -274,29 +316,23 @@ export default function KitchenView() {
                       <div>
                         <span className="text-[9px] font-black text-slate-400 block">{order.id} • {order.time}</span>
                         <h4 className="text-xs sm:text-sm font-black text-slate-900 uppercase truncate max-w-[120px] sm:max-w-[150px]">
-                          {order.customerName || order.name}
+                          {order.customerName}
                         </h4>
                       </div>
                     </div>
                     <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-200">
-                      {order.pay || 'QRIS'}
+                      {order.pay}
                     </span>
                   </div>
 
                   <div className="space-y-1.5 text-xs font-bold text-slate-700">
-                    {order.items && Array.isArray(order.items) ? (
-                      order.items.map((it, idx) => (
-                        <div key={idx} className="bg-slate-50 p-2 rounded-xl border border-slate-100">
-                          <div className="flex justify-between text-slate-900 font-black text-xs">
-                            <span>{it.qty}x {it.name}</span>
-                            <span className="text-red-600">Rp {(it.price * it.qty).toLocaleString('id-ID')}</span>
-                          </div>
-                          <p className="text-[10px] text-slate-500 mt-0.5 font-medium">{it.toppings} • {it.veg} • {it.spicy}</p>
+                    {order.items.map((it, idx) => (
+                      <div key={idx} className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                        <div className="flex justify-between text-slate-900 font-black text-xs">
+                          <span>{it.qty}x {it.name}</span>
                         </div>
-                      ))
-                    ) : (
-                      <p className="text-xs font-bold text-slate-800">{order.type}</p>
-                    )}
+                      </div>
+                    ))}
 
                     {order.notes && (
                       <p className="text-[10px] text-amber-900 italic bg-amber-50 p-2 rounded-lg border border-amber-200">
@@ -332,7 +368,7 @@ export default function KitchenView() {
             </div>
           </div>
 
-          {/* KOLOM 2: ANTREAN SIAP MASAK (BIRU SKY) */}
+          {/* KOLOM 2: ANTREAN SIAP MASAK */}
           <div className={`bg-sky-500/5 rounded-3xl p-3.5 sm:p-5 border-2 border-sky-300/80 min-h-[500px] ${
             mobileTab !== 'pending' ? 'hidden lg:block' : 'block'
           }`}>
@@ -362,7 +398,7 @@ export default function KitchenView() {
                       <div>
                         <span className="text-[9px] font-black text-slate-400 block">{order.id} • {order.time}</span>
                         <h4 className="text-xs sm:text-sm font-black text-slate-900 uppercase truncate max-w-[120px] sm:max-w-[150px]">
-                          {order.customerName || order.name}
+                          {order.customerName}
                         </h4>
                       </div>
                     </div>
@@ -372,16 +408,11 @@ export default function KitchenView() {
                   </div>
 
                   <div className="space-y-1.5 text-xs font-bold text-slate-700">
-                    {order.items && Array.isArray(order.items) ? (
-                      order.items.map((it, idx) => (
-                        <div key={idx} className="bg-slate-50 p-2 rounded-xl text-xs font-bold">
-                          <span className="text-slate-900">{it.qty}x {it.name}</span>
-                          <p className="text-[10px] text-slate-500 mt-0.5">{it.toppings} • {it.veg} • {it.spicy}</p>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-xs font-bold text-slate-800">{order.type}</p>
-                    )}
+                    {order.items.map((it, idx) => (
+                      <div key={idx} className="bg-slate-50 p-2 rounded-xl text-xs font-bold">
+                        <span className="text-slate-900">{it.qty}x {it.name}</span>
+                      </div>
+                    ))}
                   </div>
 
                   <button 
@@ -396,7 +427,7 @@ export default function KitchenView() {
             </div>
           </div>
 
-          {/* KOLOM 3: SEDANG DIMASAK DI WAJAN (MERAH API SIBOY) */}
+          {/* KOLOM 3: SEDANG DIMASAK DI WAJAN */}
           <div className={`bg-red-500/5 rounded-3xl p-3.5 sm:p-5 border-2 border-red-300/80 min-h-[500px] ${
             mobileTab !== 'cooking' ? 'hidden lg:block' : 'block'
           }`}>
@@ -426,7 +457,7 @@ export default function KitchenView() {
                       <div>
                         <span className="text-[9px] font-black text-slate-400 block">{order.id} • {order.time}</span>
                         <h4 className="text-xs sm:text-sm font-black text-slate-900 uppercase truncate max-w-[120px] sm:max-w-[150px]">
-                          {order.customerName || order.name}
+                          {order.customerName}
                         </h4>
                       </div>
                     </div>
@@ -436,16 +467,11 @@ export default function KitchenView() {
                   </div>
 
                   <div className="space-y-1.5 text-xs font-bold text-slate-700">
-                    {order.items && Array.isArray(order.items) ? (
-                      order.items.map((it, idx) => (
-                        <div key={idx} className="bg-red-50/50 border border-red-100 p-2 rounded-xl text-xs font-bold">
-                          <span className="text-slate-900">{it.qty}x {it.name}</span>
-                          <p className="text-[10px] text-slate-500 mt-0.5">{it.toppings} • {it.veg} • {it.spicy}</p>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-xs font-bold text-slate-800">{order.type}</p>
-                    )}
+                    {order.items.map((it, idx) => (
+                      <div key={idx} className="bg-red-50/50 border border-red-100 p-2 rounded-xl text-xs font-bold">
+                        <span className="text-slate-900">{it.qty}x {it.name}</span>
+                      </div>
+                    ))}
                   </div>
 
                   <button 

@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Search, FileText, Download, MoreHorizontal, 
-  X, Eye, Printer, Trash2, Receipt, Menu
+  X, Eye, Printer, Trash2, Receipt, Menu,
+  DollarSign, TrendingUp, CreditCard, Banknote, RefreshCw
 } from 'lucide-react';
 
 import AdminSidebar from '@/components/AdminSidebar';
@@ -17,66 +18,87 @@ export default function OrderHistory() {
   const [activeDropdown, setActiveDropdown] = useState(null); 
   const [searchTerm, setSearchTerm] = useState(''); 
   const [isMounted, setIsMounted] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   
   const [historyData, setHistoryData] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
+
+  // Ambil data langsung dari Supabase via /api/orders
+  const loadOrdersFromDb = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/orders');
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        const mapped = json.data.map((o) => {
+          const createdAtDate = o.createdAt ? new Date(o.createdAt) : new Date();
+          const formattedDate = createdAtDate.toLocaleDateString('id-ID', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric'
+          });
+          const formattedTime = createdAtDate.toLocaleTimeString('id-ID', {
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+
+          // Deteksi metode bayar dari notes
+          const isQris = (o.notes || '').toUpperCase().includes('QRIS');
+
+          // Ekstrak nomor antrean [#01] jika ada
+          const queueMatch = o.notes?.match(/\[#(.*?)\]/);
+          const queueBadge = queueMatch ? `#${queueMatch[1]}` : `#${o.id.slice(-3)}`;
+
+          return {
+            id: o.id,
+            queueBadge,
+            timestamp: createdAtDate.getTime(),
+            date: formattedDate,
+            time: formattedTime,
+            customerName: o.customerName || 'Pelanggan',
+            totalPrice: o.totalPrice || 0,
+            total: `Rp ${(o.totalPrice || 0).toLocaleString('id-ID')}`,
+            pay: isQris ? 'QRIS' : 'CASH',
+            stat: o.status || 'pending',
+            notes: o.notes || '',
+            items: (o.items || []).map((it) => ({
+              id: it.id,
+              name: it.menuName,
+              qty: it.quantity,
+              price: it.price,
+            }))
+          };
+        });
+
+        setHistoryData(mapped);
+      }
+    } catch (e) {
+      console.error('Gagal mengambil data dari Supabase:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
     setIsMounted(true);
     const auth = localStorage.getItem('admin_auth');
     if (!auth) router.push('/admin/login');
 
-    const loadOrders = () => {
-      try {
-        const saved = localStorage.getItem('siboy_order_history');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          setHistoryData(Array.isArray(parsed) ? parsed : []);
-        } else {
-          setHistoryData([]);
-        }
-      } catch (e) {
-        setHistoryData([]);
-      }
-    };
-
-    loadOrders();
-    window.addEventListener('storage', loadOrders);
-    return () => window.removeEventListener('storage', loadOrders);
+    loadOrdersFromDb();
   }, [router]);
 
-  const saveHistoryToStorage = (updated) => {
-    setHistoryData(updated);
-    localStorage.setItem('siboy_order_history', JSON.stringify(updated));
-    window.dispatchEvent(new Event('storage'));
-  };
-
   const resolveOrderType = (row) => {
-    if (row.type && String(row.type).trim() !== '') return row.type;
     if (row.items && Array.isArray(row.items) && row.items.length > 0) {
-      return row.items.map(it => `${it.qty || it.quantity || 1}x ${it.name}`).join(' + ');
+      return row.items.map(it => `${it.qty}x ${it.name}`).join(' + ');
     }
     return 'Takoyaki Siboy';
   };
 
-  const resolveOrderToppings = (row) => {
-    if (row.toppings && String(row.toppings).trim() !== '') return row.toppings;
-    if (row.items && Array.isArray(row.items) && row.items.length > 0) {
-      const collected = row.items
-        .map(it => it.toppings)
-        .filter(Boolean)
-        .join(', ');
-      return collected || 'Tanpa Topping (Polos)';
-    }
-    return 'Tanpa Topping (Polos)';
-  };
-
   const filterByPeriod = (item) => {
     if (period === 'all') return true;
-    const itemTimestamp = item.timestamp || (item.date ? new Date(item.date).getTime() : null);
-    if (!itemTimestamp) return true;
+    if (!item.timestamp) return true;
 
-    const itemDate = new Date(Number(itemTimestamp));
+    const itemDate = new Date(Number(item.timestamp));
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     const itemTimeMs = itemDate.getTime();
@@ -98,15 +120,29 @@ export default function OrderHistory() {
     .filter(item => {
       const q = searchTerm.toLowerCase();
       const idMatch = item.id && item.id.toLowerCase().includes(q);
-      const nameMatch = (item.name || item.customerName || '').toLowerCase().includes(q);
+      const nameMatch = (item.customerName || '').toLowerCase().includes(q);
       const typeMatch = resolveOrderType(item).toLowerCase().includes(q);
       return idMatch || nameMatch || typeMatch;
     });
 
-  const handleDelete = (id) => {
-    if (confirm(`Yakin ingin menghapus data transaksi ${id}?`)) {
-      const updated = historyData.filter(item => item.id !== id);
-      saveHistoryToStorage(updated);
+  // Metrik Ringkasan Omzet
+  const totalOmzet = filteredData.reduce((acc, curr) => acc + (curr.totalPrice || 0), 0);
+  const totalCash = filteredData.filter(d => d.pay === 'CASH').reduce((acc, curr) => acc + (curr.totalPrice || 0), 0);
+  const totalQris = filteredData.filter(d => d.pay === 'QRIS').reduce((acc, curr) => acc + (curr.totalPrice || 0), 0);
+
+  const handleDelete = async (id) => {
+    if (confirm(`Yakin ingin menghapus data transaksi ${id} dari database?`)) {
+      try {
+        const res = await fetch(`/api/orders?id=${id}`, { method: 'DELETE' });
+        const json = await res.json();
+        if (json.success) {
+          setHistoryData(prev => prev.filter(item => item.id !== id));
+        } else {
+          alert('Gagal menghapus: ' + json.message);
+        }
+      } catch (err) {
+        alert('Gagal menghapus pesanan dari server.');
+      }
       setActiveDropdown(null);
     }
   };
@@ -120,16 +156,13 @@ export default function OrderHistory() {
   };
 
   const exportToExcel = () => {
-    const headers = ['ID Transaksi', 'Tanggal', 'Waktu', 'Pelanggan', 'Menu Utama', 'Topping', 'Sayur', 'Pedas', 'Total Bayar', 'Metode', 'Status'];
+    const headers = ['ID Transaksi', 'No Antrean', 'Tanggal', 'Waktu', 'Pelanggan', 'Rincian Menu', 'Total Bayar', 'Metode', 'Status'];
     const csvContent = [
       headers.join(','),
       ...filteredData.map(r => {
         const typeText = resolveOrderType(r).replace(/"/g, '""');
-        const toppingText = resolveOrderToppings(r).replace(/"/g, '""');
-        const custName = (r.customerName || r.name || 'PELANGGAN').replace(/"/g, '""');
-        const rawStat = (r.stat || 'Selesai').toLowerCase();
-        const statLabel = (rawStat.includes('menunggu') || rawStat.includes('waiting')) ? 'Menunggu' : 'Selesai';
-        return `"${r.id}","${r.date}","${r.time}","${custName}","${typeText}","${toppingText}","${r.veg || '-'}","${r.spicy || '-'}","${r.total}","${r.pay}","${statLabel}"`;
+        const custName = (r.customerName || 'PELANGGAN').replace(/"/g, '""');
+        return `"${r.id}","${r.queueBadge || '-'}","${r.date}","${r.time}","${custName}","${typeText}","${r.totalPrice}","${r.pay}","${r.stat}"`;
       })
     ].join('\n');
 
@@ -165,7 +198,52 @@ export default function OrderHistory() {
               <h1 className="text-xl sm:text-3xl font-black uppercase tracking-tight text-slate-800 leading-none" style={{ fontFamily: "'Montserrat', sans-serif" }}>
                 ORDER <span className="text-indigo-600">HISTORY</span>
               </h1>
-              <p className="text-[10px] sm:text-xs font-bold text-slate-400 mt-1 hidden sm:block">Laporan transaksi kasir & self-order pembeli.</p>
+              <p className="text-[10px] sm:text-xs font-bold text-slate-400 mt-1 hidden sm:block">History penjualan selama ini .</p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={loadOrdersFromDb}
+            className="flex items-center gap-1.5 text-xs font-black uppercase px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 text-slate-600 transition-all cursor-pointer active:scale-95"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Refresh Data</span>
+          </button>
+        </div>
+
+        {/* METRIK KARTU OMZET */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 print:hidden">
+          <div className="bg-white rounded-2xl p-5 border-2 border-slate-100 shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Omzet</p>
+              <h3 className="text-xl sm:text-2xl font-black text-slate-900 mt-1">Rp {totalOmzet.toLocaleString('id-ID')}</h3>
+              <p className="text-[10px] font-bold text-slate-400 mt-0.5">{filteredData.length} Transaksi</p>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-100 text-amber-600 flex items-center justify-center">
+              <TrendingUp className="w-6 h-6" />
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl p-5 border-2 border-slate-100 shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Tunai (Cash)</p>
+              <h3 className="text-xl sm:text-2xl font-black text-slate-900 mt-1">Rp {totalCash.toLocaleString('id-ID')}</h3>
+              <p className="text-[10px] font-bold text-slate-400 mt-0.5">Uang Fisik Kasir</p>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center">
+              <Banknote className="w-6 h-6" />
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl p-5 border-2 border-slate-100 shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-sky-600">QRIS Non-Tunai</p>
+              <h3 className="text-xl sm:text-2xl font-black text-slate-900 mt-1">Rp {totalQris.toLocaleString('id-ID')}</h3>
+              <p className="text-[10px] font-bold text-slate-400 mt-0.5">Masuk Rekening/e-Wallet</p>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-sky-50 border border-sky-100 text-sky-600 flex items-center justify-center">
+              <CreditCard className="w-6 h-6" />
             </div>
           </div>
         </div>
@@ -173,7 +251,7 @@ export default function OrderHistory() {
         {/* KOP CETAK DOKUMEN */}
         <div className="hidden print:block text-center border-b-2 border-slate-800 pb-4 mb-6 pt-8">
           <h1 className="text-2xl font-black uppercase tracking-widest text-slate-900" style={{ fontFamily: "'Montserrat', sans-serif" }}>TAKOYAKI SIBOY</h1>
-          <p className="text-sm font-bold text-slate-600 mt-1">Laporan Penjualan & Audit Transaksi</p>
+          <p className="text-sm font-bold text-slate-600 mt-1">Laporan Penjualan & Audit Transaksi Supabase</p>
           <p className="text-xs text-slate-500 mt-1">
             Dicetak pada: {isMounted ? `${new Date().toLocaleDateString('id-ID')} ${new Date().toLocaleTimeString('id-ID')}` : '-'}
           </p>
@@ -229,7 +307,13 @@ export default function OrderHistory() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 print:divide-slate-300">
-                {filteredData.length === 0 ? (
+                {isLoading ? (
+                  <tr>
+                    <td colSpan="6" className="text-center py-12 text-slate-400 font-bold text-sm">
+                      Memuat data transaksi dari Supabase...
+                    </td>
+                  </tr>
+                ) : filteredData.length === 0 ? (
                   <tr>
                     <td colSpan="6" className="text-center py-12 text-slate-400 font-bold text-sm">
                       Belum ada transaksi di periode ini.
@@ -238,28 +322,34 @@ export default function OrderHistory() {
                 ) : (
                   filteredData.map((row) => {
                     const resolvedMenu = resolveOrderType(row);
-                    const resolvedTopping = resolveOrderToppings(row);
-
-                    const rawStatus = (row.stat || 'Selesai').toLowerCase();
-                    const isWaiting = rawStatus.includes('menunggu') || rawStatus.includes('waiting');
-                    const isDone = rawStatus.includes('selesai') || rawStatus.includes('ready') || rawStatus.includes('lunas');
+                    const rawStatus = (row.stat || '').toLowerCase();
+                    const isWaiting = rawStatus === 'pending' || rawStatus === 'waiting_verification';
+                    const isCooking = rawStatus === 'cooking';
+                    const isDone = rawStatus === 'selesai' || rawStatus === 'ready';
 
                     return (
                       <tr key={row.id} className="hover:bg-slate-50/50 transition-colors group">
                         <td className="p-4 pl-6">
-                          <span className="font-mono text-xs font-black text-slate-800 block">{row.id}</span>
-                          <span className="text-[9px] font-bold text-slate-400">{row.date} • {row.time}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-200">
+                              {row.queueBadge}
+                            </span>
+                            <span className="font-mono text-xs font-black text-slate-800 block">{row.id}</span>
+                          </div>
+                          <span className="text-[9px] font-bold text-slate-400 mt-0.5 block">{row.date} • {row.time}</span>
                         </td>
                         <td className="p-4">
                           <span className="text-xs font-bold text-slate-800 block uppercase">
-                            {row.customerName || row.name || 'PELANGGAN'}
+                            {row.customerName}
                           </span>
                         </td>
                         <td className="p-4">
-                          <span className="text-xs font-black text-slate-900 block">{resolvedMenu}</span>
-                          <span className="text-[9px] font-bold text-slate-400 block mt-0.5">
-                            Top: {resolvedTopping}
-                          </span>
+                          <span className="text-xs font-black text-slate-900 block max-w-[280px] truncate">{resolvedMenu}</span>
+                          {row.notes && (
+                            <span className="text-[9px] font-bold text-slate-400 block mt-0.5 truncate max-w-[250px]">
+                              {row.notes}
+                            </span>
+                          )}
                         </td>
                         <td className="p-4">
                           <span className="text-xs font-black text-slate-800 block mb-1">{row.total}</span>
@@ -271,10 +361,12 @@ export default function OrderHistory() {
                           <span className={`inline-block text-[9px] font-black uppercase px-2.5 py-1 rounded-full border print:border-slate-400
                             ${isWaiting 
                               ? 'bg-amber-100 text-amber-700 border-amber-200' 
-                              : isDone 
-                                ? 'bg-emerald-100 text-emerald-700 border-emerald-200' 
-                                : 'bg-slate-100 text-slate-600 border-slate-200'} print:text-black print:bg-transparent`}>
-                            {isWaiting ? 'Menunggu' : 'Selesai'}
+                              : isCooking
+                                ? 'bg-red-100 text-red-700 border-red-200'
+                                : isDone 
+                                  ? 'bg-emerald-100 text-emerald-700 border-emerald-200' 
+                                  : 'bg-slate-100 text-slate-600 border-slate-200'} print:text-black print:bg-transparent`}>
+                            {isWaiting ? 'Menunggu' : isCooking ? 'Dimasak' : isDone ? 'Selesai' : row.stat}
                           </span>
                         </td>
                         
@@ -314,18 +406,7 @@ export default function OrderHistory() {
           </div>
 
           <div className="p-4 sm:p-5 border-t border-slate-100 flex items-center justify-between bg-slate-50/30 rounded-b-3xl print:hidden">
-            <span className="text-[10px] font-bold text-slate-400">Total: {filteredData.length} Transaksi Tercatat</span>
-            <button 
-              type="button"
-              onClick={() => {
-                if (confirm('Bersihkan seluruh riwayat transaksi? Data tidak bisa dikembalikan.')) {
-                  saveHistoryToStorage([]);
-                }
-              }} 
-              className="text-[10px] font-black uppercase text-rose-500 hover:underline cursor-pointer"
-            >
-              Reset Riwayat
-            </button>
+            <span className="text-[10px] font-bold text-slate-400">Total: {filteredData.length} Transaksi Tercatat di Database</span>
           </div>
         </div>
       </div>
@@ -343,7 +424,7 @@ export default function OrderHistory() {
                 </div>
                 <div>
                   <h3 className="text-sm font-black uppercase tracking-wider text-slate-800" style={{ fontFamily: "'Montserrat', sans-serif" }}>Detail Transaksi</h3>
-                  <p className="font-mono text-xs font-bold text-indigo-600 mt-0.5">{selectedOrder.id}</p>
+                  <p className="font-mono text-xs font-bold text-indigo-600 mt-0.5">{selectedOrder.queueBadge} • {selectedOrder.id}</p>
                 </div>
               </div>
               <button type="button" onClick={() => setSelectedOrder(null)} className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-rose-500 hover:border-rose-200 transition-colors cursor-pointer">
@@ -355,7 +436,7 @@ export default function OrderHistory() {
               <div className="flex justify-between items-end pb-3 border-b border-slate-100">
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Pelanggan</p>
-                  <p className="text-sm font-black text-slate-800 uppercase">{selectedOrder.customerName || selectedOrder.name || 'PELANGGAN'}</p>
+                  <p className="text-sm font-black text-slate-800 uppercase">{selectedOrder.customerName}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Waktu</p>
@@ -363,36 +444,26 @@ export default function OrderHistory() {
                 </div>
               </div>
 
-              {selectedOrder.items && Array.isArray(selectedOrder.items) && selectedOrder.items.length > 0 ? (
+              {selectedOrder.items && selectedOrder.items.length > 0 ? (
                 <div className="space-y-2.5">
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Rincian Menu</p>
                   {selectedOrder.items.map((it, idx) => (
                     <div key={idx} className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-1">
                       <div className="flex justify-between text-xs font-black text-slate-800">
-                        <span>{it.qty || it.quantity || 1}x {it.name}</span>
-                        <span>Rp {((it.price || 0) * (it.qty || it.quantity || 1)).toLocaleString('id-ID')}</span>
+                        <span>{it.qty}x {it.name}</span>
+                        <span>Rp {(it.price * it.qty).toLocaleString('id-ID')}</span>
                       </div>
-                      <p className="text-[10px] font-bold text-slate-500">Topping: {it.toppings || '-'}</p>
-                      <p className="text-[9px] text-slate-400">{it.veg || it.sayur || 'Pakai Sayur'} • {it.spicy || it.level || 'Normal'}</p>
-                      {it.note && <p className="text-[9px] text-amber-600 italic">Catatan: {it.note}</p>}
                     </div>
                   ))}
+                  {selectedOrder.notes && (
+                    <p className="text-[10px] text-slate-500 italic bg-slate-50 p-2 rounded-lg border border-slate-100">
+                      Catatan: "{selectedOrder.notes}"
+                    </p>
+                  )}
                 </div>
               ) : (
-                <div className="space-y-2 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                  <p className="text-sm font-black text-slate-800 mb-1">{resolveOrderType(selectedOrder)}</p>
-                  <div className="flex justify-between text-xs font-bold">
-                    <span className="text-slate-500">Topping:</span>
-                    <span className="text-slate-800 text-right">{resolveOrderToppings(selectedOrder)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs font-bold">
-                    <span className="text-slate-500">Sayur:</span>
-                    <span className="text-slate-800 text-right">{selectedOrder.veg || '-'}</span>
-                  </div>
-                  <div className="flex justify-between text-xs font-bold">
-                    <span className="text-slate-500">Level Pedas:</span>
-                    <span className="text-rose-600 text-right">{selectedOrder.spicy || '-'}</span>
-                  </div>
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs font-bold text-slate-600">
+                  {resolveOrderType(selectedOrder)}
                 </div>
               )}
             </div>

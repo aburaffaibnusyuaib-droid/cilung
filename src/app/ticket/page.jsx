@@ -4,7 +4,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { 
   CheckCircle2, Clock, Flame, Receipt, 
-  ChevronRight, Store, Sparkles, Banknote, QrCode
+  ChevronRight, Store, Sparkles, Banknote, QrCode, RefreshCw
 } from 'lucide-react';
 
 const InstagramIcon = ({ className = 'w-4 h-4' }) => (
@@ -21,51 +21,125 @@ function TicketContent() {
 
   const [isMounted, setIsMounted] = useState(false);
   const [currentOrder, setCurrentOrder] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Ambil data pesanan langsung dari Supabase via API
+  const fetchOrderLive = async () => {
+    if (!targetId) {
+      try {
+        const res = await fetch('/api/orders');
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          parseAndSetOrder(json.data[0]);
+        } else {
+          setCurrentOrder(null);
+        }
+      } catch (e) {
+        fallbackLocalStorage();
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/orders?id=${targetId}`);
+      const json = await res.json();
+
+      if (json.success && json.data) {
+        parseAndSetOrder(json.data);
+      } else {
+        fallbackLocalStorage();
+      }
+    } catch (e) {
+      fallbackLocalStorage();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Parsing data Supabase agar sesuai dengan UI kartu tiket
+  const parseAndSetOrder = (dbOrder) => {
+    const rawStatus = (dbOrder.status || '').toLowerCase();
+    let mappedStatus = 'pending';
+
+    if (rawStatus === 'cooking' || rawStatus === 'dimasak') {
+      mappedStatus = 'cooking';
+    } else if (rawStatus === 'ready' || rawStatus === 'selesai' || rawStatus === 'siap') {
+      mappedStatus = 'ready';
+    } else if (rawStatus === 'waiting_verification' || rawStatus === 'waiting') {
+      mappedStatus = 'waiting_verification';
+    } else {
+      mappedStatus = 'pending';
+    }
+
+    // Ekstrak nomor antrean [#01] jika ada di catatan
+    const queueMatch = dbOrder.notes?.match(/\[#(.*?)\]/);
+    let queueBadge = queueMatch ? `#${queueMatch[1]}` : `#${dbOrder.id.slice(-3)}`;
+    if (!queueMatch && dbOrder.id.startsWith('SB-')) {
+      const parts = dbOrder.id.split('-');
+      queueBadge = `#${parts[parts.length - 1]}`;
+    }
+
+    const orderTime = dbOrder.createdAt
+      ? new Date(dbOrder.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+      : '-';
+
+    const isQris = (dbOrder.notes || '').toUpperCase().includes('QRIS');
+
+    setCurrentOrder({
+      id: dbOrder.id,
+      queueNumber: queueBadge,
+      status: mappedStatus,
+      customerName: dbOrder.customerName || 'PELANGGAN',
+      time: orderTime,
+      total: `Rp ${(dbOrder.totalPrice || 0).toLocaleString('id-ID')}`,
+      pay: isQris ? 'QRIS' : 'CASH',
+      items: (dbOrder.items || []).map((it) => ({
+        name: it.menuName,
+        qty: it.quantity,
+        price: it.price,
+        toppings: it.menuName.includes('(') ? it.menuName.split('(')[1]?.replace(')', '') : 'Porsi Spesial',
+        veg: 'Pakai Sayur',
+        spicy: 'Normal'
+      }))
+    });
+  };
+
+  // Cadangan offline bila koneksi terputus
+  const fallbackLocalStorage = () => {
+    try {
+      const historyOrders = JSON.parse(localStorage.getItem('siboy_order_history') || '[]');
+      const kitchenOrders = JSON.parse(localStorage.getItem('siboy_kitchen_orders') || '[]');
+
+      if (historyOrders.length === 0) return setCurrentOrder(null);
+
+      const matchedHistory = targetId 
+        ? historyOrders.find(h => h.id === targetId) 
+        : historyOrders[0];
+
+      if (!matchedHistory) return setCurrentOrder(null);
+
+      const activeInKitchen = kitchenOrders.find(k => k.id === matchedHistory.id);
+      let liveStatus = activeInKitchen ? activeInKitchen.status : (matchedHistory.status || 'ready');
+      let liveQueue = activeInKitchen?.qNo || matchedHistory.qNo || '#01';
+
+      setCurrentOrder({
+        ...matchedHistory,
+        status: liveStatus,
+        queueNumber: liveQueue,
+        customerName: matchedHistory.customerName || matchedHistory.name || 'PELANGGAN'
+      });
+    } catch (err) {}
+  };
 
   useEffect(() => {
     setIsMounted(true);
+    fetchOrderLive();
 
-    const syncTicketData = () => {
-      try {
-        const historyOrders = JSON.parse(localStorage.getItem('siboy_order_history') || '[]');
-        const kitchenOrders = JSON.parse(localStorage.getItem('siboy_kitchen_orders') || '[]');
-
-        if (historyOrders.length === 0) {
-          setCurrentOrder(null);
-          return;
-        }
-
-        const matchedHistory = targetId 
-          ? historyOrders.find(h => h.id === targetId) 
-          : historyOrders[0];
-
-        if (!matchedHistory) {
-          setCurrentOrder(null);
-          return;
-        }
-
-        const activeInKitchen = kitchenOrders.find(k => k.id === matchedHistory.id);
-
-        let liveStatus = activeInKitchen ? activeInKitchen.status : (matchedHistory.status || 'ready');
-        let liveQueue = activeInKitchen?.qNo || matchedHistory.qNo || '#01';
-
-        setCurrentOrder({
-          ...matchedHistory,
-          status: liveStatus,
-          queueNumber: liveQueue,
-          customerName: matchedHistory.customerName || matchedHistory.name || 'PELANGGAN'
-        });
-      } catch (e) {}
-    };
-
-    syncTicketData();
-    window.addEventListener('storage', syncTicketData);
-    const interval = setInterval(syncTicketData, 1000);
-
-    return () => {
-      window.removeEventListener('storage', syncTicketData);
-      clearInterval(interval);
-    };
+    // Polling background setiap 3 detik
+    const interval = setInterval(fetchOrderLive, 3000);
+    return () => clearInterval(interval);
   }, [targetId]);
 
   const isUnverified = currentOrder?.status === 'waiting_verification';
@@ -95,7 +169,16 @@ function TicketContent() {
     }
   };
 
-  if (!isMounted) return null;
+  if (!isMounted || isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex justify-center items-center p-4">
+        <div className="flex items-center gap-2 text-slate-500 text-xs font-bold">
+          <RefreshCw className="w-4 h-4 animate-spin text-amber-500" />
+          <span>Memuat Karcis Digital...</span>
+        </div>
+      </div>
+    );
+  }
 
   if (!currentOrder) {
     return (
@@ -111,20 +194,15 @@ function TicketContent() {
     );
   }
 
-  const activeTheme = statusConfig[currentOrder.status] || statusConfig.waiting_verification;
+  const activeTheme = statusConfig[currentOrder.status] || statusConfig.pending;
   const isMultiItem = (currentOrder.items?.length || 0) > 1;
 
   return (
     <div className="min-h-[100dvh] bg-slate-100 sm:bg-slate-200/80 flex justify-center items-center sm:p-6" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
       
-      {/* 
-        CONTAINER DINAMIS: 
-        - Di Mobile (<640px): Full 100dvh, lebar 100%, tanpa padding luar abu-abu (Native App Look).
-        - Di Desktop (>=640px): max-w-[460px], sudut rounded-[2.5rem], shadow tebal elegan.
-      */}
       <div className="w-full h-[100dvh] sm:h-auto sm:max-h-[92vh] sm:max-w-[460px] bg-[#faf9f6] sm:rounded-[2.5rem] sm:shadow-2xl relative flex flex-col sm:border sm:border-slate-200/80 overflow-hidden">
         
-        {/* Motif Background Grid Halus */}
+        {/* Motif Background Grid */}
         <div className="absolute inset-0 pointer-events-none z-0 opacity-30" style={{ backgroundSize: '24px 24px', backgroundImage: 'linear-gradient(to right, rgba(0, 0, 0, 0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(0, 0, 0, 0.05) 1px, transparent 1px)' }} />
 
         {/* 1. HEADER BRAND */}
@@ -148,7 +226,7 @@ function TicketContent() {
         {/* 2. BODY KONTEN */}
         <div className="p-4 sm:p-5 relative z-10 flex-1 flex flex-col justify-between overflow-y-auto space-y-3 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           
-          {/* KARTU NOMOR ANTREAN (Ukuran pas, tebal & proporsional) */}
+          {/* KARTU NOMOR ANTREAN */}
           <div className={`rounded-2xl p-4 sm:p-4.5 border-2 transition-all flex items-center justify-between shadow-xs shrink-0 ${activeTheme.bg} ${activeTheme.border}`}>
             <div className="min-w-0 pr-2">
               <span className="text-[9px] font-black uppercase tracking-wider opacity-60 block leading-none">No. Antrean</span>
@@ -219,7 +297,7 @@ function TicketContent() {
                     <div className="flex-1 pr-3">
                       <p className="text-xs sm:text-[13px] font-black text-slate-900 leading-tight">{item.qty}x {item.name}</p>
                       <p className="text-[9.5px] sm:text-[10px] font-semibold text-slate-500 leading-snug mt-0.5">
-                        {item.toppings} • {item.veg} • {item.spicy}
+                        {item.toppings}
                       </p>
                     </div>
                     <span className="text-xs sm:text-[13px] font-black text-slate-800 whitespace-nowrap">

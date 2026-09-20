@@ -2,7 +2,19 @@
 
 import React, { useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Clock, Sparkles, Flame, Store, MessageCircle, ExternalLink } from 'lucide-react';
+import { Clock, ExternalLink } from 'lucide-react';
+
+/* Vector Logo GoFood Otentik */
+const GoFoodIcon = ({ className = "w-4 h-4" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+    <circle cx="12" cy="12" r="10" fill="#EE2737" />
+    <path 
+      d="M7 11.8c0-2.8 2.2-5 5-5s5 2.2 5 5c0 2.2-1.4 4-3.4 4.7v-2.2c1-.5 1.6-1.5 1.6-2.5 0-1.8-1.4-3.2-3.2-3.2S8.8 10 8.8 11.8c0 1.1.6 2 1.6 2.5v2.2C8.4 15.8 7 14 7 11.8z" 
+      fill="#ffffff" 
+    />
+    <circle cx="12" cy="11.8" r="1.5" fill="#ffffff" />
+  </svg>
+);
 
 export default function Footer() {
   const router = useRouter();
@@ -33,12 +45,14 @@ export default function Footer() {
   // TAUTAN PENTING
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
   const waUrl = "https://wa.me/6281234567890?text=Halo%20Takoyaki%20Siboy,%20mau%20pesan%20dong!";
-  const igUrl = "https://instagram.com/rwapaaa77"; 
+  const igUrl = "https://instagram.com/rwapaaa77";
+  const gofoodUrl = "https://gofood.link"; // Sesuaikan dengan link toko GoFood
 
   return (
     <footer 
       id="lokasi" 
-      className="w-full bg-[#070a11] text-slate-100 pt-12 pb-8 relative z-30 shadow-[0_-25px_50px_rgba(7,10,17,1)] overflow-hidden border-t border-slate-800/60"
+      className="w-full bg-[#070a11] text-slate-100 pt-8 sm:pt-10 pb-7 relative z-30 shadow-[0_-25px_50px_rgba(7,10,17,1)] overflow-hidden border-t border-slate-800/60"
+      style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
     >
       {/* Ornamen Ombak Jepang (Seigaiha) */}
       <svg className="absolute bottom-0 right-0 w-96 h-96 opacity-[0.02] text-white pointer-events-none select-none translate-x-1/4 translate-y-1/4" viewBox="0 0 100 100" fill="none" stroke="currentColor">
@@ -49,21 +63,20 @@ export default function Footer() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full relative z-10">
         
-        <div className="flex flex-col lg:flex-row items-stretch gap-10 lg:gap-14 pb-10 border-b border-slate-800/80">
+        <div className="flex flex-col lg:flex-row items-stretch gap-8 lg:gap-12 pb-8 border-b border-slate-800/80">
           
           {/* ==================== KIRI: LOKASI OUTLET ==================== */}
-          <div className="w-full lg:w-5/12 flex flex-col justify-between gap-4 shrink-0">
+          <div className="w-full lg:w-5/12 flex flex-col justify-between gap-3.5 shrink-0">
             <div>
-              {/* Judul Lokasi dengan Ikon Custom SVG di depan */}
-              <div className="space-y-2 mb-5">
+              <div className="space-y-1.5 mb-3.5">
                 <h4 
-                  className="flex items-center gap-2.5 text-2xl sm:text-3xl font-black text-white uppercase tracking-tight"
+                  className="flex items-center gap-2.5 text-xl sm:text-2xl font-black text-white uppercase tracking-tight"
                   style={{ fontFamily: "'Montserrat', sans-serif" }}
                 >
                   <svg 
                     xmlns="http://www.w3.org/2000/svg" 
-                    width="28" 
-                    height="28" 
+                    width="24" 
+                    height="24" 
                     viewBox="0 0 24 24" 
                     fill="none" 
                     stroke="currentColor" 
@@ -78,20 +91,19 @@ export default function Footer() {
                   LOKASI OUTLET KAMI
                 </h4>
                 
-                {/* Teks Sub-Judul Tanpa Ikon Lokasi */}
-                <p className="text-sm text-slate-400 font-medium leading-relaxed">
+                <p className="text-xs sm:text-sm text-slate-400 font-medium leading-relaxed">
                   Jl. Cipinang Muara I No.4, RT.15/RW.3, Jatinegara. <br className="hidden sm:block"/>
                   <strong className="text-amber-400 font-bold">(Patokan: Depan area SMKN 50 Jakarta)</strong>
                 </p>
               </div>
 
               {/* MAPS INTERAKTIF */}
-              <div className="w-full h-64 sm:h-72 lg:h-60 rounded-2xl overflow-hidden border border-slate-800 bg-[#0d121f] shadow-2xl relative group transition-all duration-300 hover:border-red-500/40">
+              <div className="w-full h-56 sm:h-64 lg:h-56 rounded-2xl overflow-hidden border border-slate-800 bg-[#0d121f] shadow-2xl relative group transition-all duration-300 hover:border-red-500/40">
                 <a
                   href={mapsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="absolute top-3 right-3 z-30 inline-flex items-center gap-2 bg-[#070a11]/90 hover:bg-red-600 text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-2 rounded-xl border border-slate-700/80 hover:border-red-500 shadow-xl transition-all duration-300 active:scale-95 backdrop-blur-md"
+                  className="absolute top-3 right-3 z-30 inline-flex items-center gap-1.5 bg-[#070a11]/90 hover:bg-red-600 text-white text-[10.5px] font-black uppercase tracking-wider px-3 py-1.5 rounded-xl border border-slate-700/80 hover:border-red-500 shadow-xl transition-all duration-300 active:scale-95 backdrop-blur-md"
                   style={{ fontFamily: "'Montserrat', sans-serif" }}
                 >
                   <span>BUKA DI MAPS</span>
@@ -119,130 +131,124 @@ export default function Footer() {
                 ></iframe>
               </div>
             </div>
-            <p className="text-[10.5px] text-slate-500 font-medium text-left">
-              *Klik peta atau tombol untuk membuka navigasi rute di aplikasi Google Maps.
+
+            <p className="text-[10px] text-slate-500 font-medium text-left">
+              *Klik peta atau tombol untuk membuka rute langsung di aplikasi Google Maps.
             </p>
           </div>
 
           {/* ==================== KANAN: BRAND & INFO ==================== */}
-          <div className="w-full lg:w-7/12 flex flex-col justify-between gap-6 pt-2 lg:pt-0">
+          <div className="w-full lg:w-7/12 flex flex-col justify-between gap-5">
             
-            <div className="space-y-5">
+            <div className="space-y-3">
+              {/* Header Brand dengan Lingkaran Putih Melingkar Besar */}
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-full bg-slate-900 border border-slate-700 p-1 flex items-center justify-center shrink-0 shadow-lg overflow-hidden">
+                <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white border-2 border-slate-200/90 shadow-md flex items-center justify-center p-2 shrink-0 overflow-hidden transition-transform duration-300 hover:scale-105">
                   <img 
-                    src="/logo.jpg" 
+                    src="/logosiboy.png" 
                     alt="Logo Takoyaki Siboy" 
-                    className="w-full h-full object-cover rounded-full"
+                    className="w-full h-full object-contain select-none"
+                    onError={(e) => {
+                      e.currentTarget.src = "/logo.jpg";
+                    }}
                   />
                 </div>
-                <h3 
-                  className="text-2xl sm:text-4xl font-black text-white tracking-tighter uppercase"
-                  style={{ fontFamily: "'Montserrat', sans-serif" }}
-                >
-                  TAKOYAKI <span className="text-red-600">SIBOY</span>
-                </h3>
+
+                <div className="space-y-0.5">
+                  <h3 
+                    className="text-2xl sm:text-4xl font-black text-white tracking-tight uppercase leading-none"
+                    style={{ fontFamily: "'Montserrat', sans-serif" }}
+                  >
+                    TAKOYAKI <span className="text-red-600">SIBOY</span>
+                  </h3>
+                 
+                </div>
               </div>
 
-              {/* 4 BADGES KEUNGGULAN */}
-              <div className="flex flex-wrap items-center gap-2.5">
-                <span 
-                  className="inline-flex items-center gap-1.5 text-[10px] sm:text-[11px] font-black uppercase tracking-widest bg-amber-500/10 border border-amber-500/40 text-amber-400 px-3 py-1.5 rounded-full hover:bg-amber-500/20 hover:shadow-[0_0_12px_rgba(251,191,36,0.3)] transition-all duration-300 cursor-default"
-                  style={{ fontFamily: "'Montserrat', sans-serif" }}
-                >
-                  <Sparkles className="w-3.5 h-3.5 shrink-0" />
-                  <span>Fresh Made</span>
-                </span>
-                <span 
-                  className="inline-flex items-center gap-1.5 text-[10px] sm:text-[11px] font-black uppercase tracking-widest bg-red-500/10 border border-red-500/40 text-red-400 px-3 py-1.5 rounded-full hover:bg-red-500/20 hover:shadow-[0_0_12px_rgba(239,68,68,0.3)] transition-all duration-300 cursor-default"
-                  style={{ fontFamily: "'Montserrat', sans-serif" }}
-                >
-                  <Flame className="w-3.5 h-3.5 shrink-0" />
-                  <span>Mix Topping</span>
-                </span>
-                <span 
-                  className="inline-flex items-center gap-1.5 text-[10px] sm:text-[11px] font-black uppercase tracking-widest bg-emerald-500/10 border border-emerald-500/40 text-emerald-400 px-3 py-1.5 rounded-full hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.3)] transition-all duration-300 cursor-default"
-                  style={{ fontFamily: "'Montserrat', sans-serif" }}
-                >
-                  <MessageCircle className="w-3.5 h-3.5 shrink-0" />
-                  <span>Pesan WA</span>
-                </span>
-                <span 
-                  className="inline-flex items-center gap-1.5 text-[10px] sm:text-[11px] font-black uppercase tracking-widest bg-sky-500/10 border border-sky-500/40 text-sky-400 px-3 py-1.5 rounded-full hover:bg-sky-500/20 hover:shadow-[0_0_12px_rgba(14,165,233,0.3)] transition-all duration-300 cursor-default"
-                  style={{ fontFamily: "'Montserrat', sans-serif" }}
-                >
-                  <Store className="w-3.5 h-3.5 shrink-0" />
-                  <span>Lapak Netap</span>
-                </span>
-              </div>
+              <p className="text-xs sm:text-sm text-slate-400 font-medium leading-relaxed max-w-xl">
+                Jajanan takoyaki otentik khas street food. Luar garing, dalam lumer, diracik fresh langsung dari wajan pemanggang sesaat setelah dipesan.
+              </p>
             </div>
 
-            <p className="text-sm text-slate-400 font-medium leading-relaxed max-w-xl">
-              Jajanan takoyaki otentik khas street food. Luar garing, dalam lumer, diracik fresh langsung dari wajan panggang di depan kamu!
-            </p>
-
-            <div className="space-y-2">
+            {/* NAVIGASI PINTAS TERANGKAT */}
+            <div className="space-y-1.5 pt-1">
               <h4 
-                className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em]"
+                className="text-[10px] sm:text-[11px] font-black text-slate-500 uppercase tracking-[0.2em]"
                 style={{ fontFamily: "'Montserrat', sans-serif" }}
               >
                 NAVIGASI PINTAS
               </h4>
-              <ul className="flex flex-wrap items-center gap-5 sm:gap-7 text-xs font-bold text-slate-300">
+              <ul className="flex flex-wrap items-center gap-5 sm:gap-6 text-xs font-bold text-slate-300">
                 <li><a href="#hero" className="hover:text-red-500 transition-colors">Beranda</a></li>
                 <li><a href="#menu" className="hover:text-red-500 transition-colors">Menu Takoyaki</a></li>
+                <li><a href="#about-us" className="hover:text-red-500 transition-colors">Tentang Kami</a></li>
                 <li><a href="#lokasi" className="hover:text-red-500 transition-colors">Titik Lokasi</a></li>
               </ul>
             </div>
 
-            {/* ACTION CARDS */}
-            <div className="flex flex-wrap items-center gap-3 pt-2">
+            {/* ACTION BUTTONS (Jam Operasional, WhatsApp, GoFood, & Instagram) */}
+            <div className="flex flex-wrap items-center gap-2.5 pt-1">
+              {/* Jam Operasional */}
               <div 
-                className="inline-flex items-center justify-center gap-2 bg-amber-400 border border-amber-400 text-slate-950 px-5 py-3 rounded-xl text-xs font-black tracking-wide uppercase shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_4px_20px_rgba(251,191,36,0.25)] cursor-default"
+                className="inline-flex items-center justify-center gap-1.5 bg-amber-400 border border-amber-400 text-slate-950 px-4 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase shadow-md transition-all duration-300 cursor-default"
                 style={{ fontFamily: "'Montserrat', sans-serif" }}
               >
-                <Clock className="w-4 h-4 shrink-0" />
+                <Clock className="w-3.5 h-3.5 shrink-0" />
                 <span>16.00 - 22.00 WIB</span>
               </div>
 
+              {/* WhatsApp */}
               <a
                 href={waUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 border border-emerald-500 text-slate-950 px-5 py-3 rounded-xl text-xs font-black tracking-wide uppercase transition-all duration-300 shadow-md hover:-translate-y-1 hover:shadow-[0_4px_20px_rgba(16,185,129,0.25)] active:scale-95"
+                className="inline-flex items-center justify-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 border border-emerald-500 text-slate-950 px-4 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all duration-300 shadow-md hover:-translate-y-0.5 active:scale-95"
                 style={{ fontFamily: "'Montserrat', sans-serif" }}
               >
-                <svg className="w-4 h-4 fill-slate-950 shrink-0" viewBox="0 0 24 24">
+                <svg className="w-3.5 h-3.5 fill-slate-950 shrink-0" viewBox="0 0 24 24">
                   <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.572-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
                 </svg>
                 <span>PESAN WA</span>
               </a>
 
+              {/* GoFood */}
+              <a
+                href={gofoodUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-1.5 bg-[#EE2737] hover:bg-[#d91e2e] border border-[#EE2737] text-white px-4 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all duration-300 shadow-md hover:-translate-y-0.5 active:scale-95"
+                style={{ fontFamily: "'Montserrat', sans-serif" }}
+              >
+                <GoFoodIcon className="w-4 h-4 shrink-0" />
+                <span>GOFOOD</span>
+              </a>
+
+              {/* Instagram */}
               <a
                 href={igUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 bg-pink-600 hover:bg-pink-500 border border-pink-600 text-white px-5 py-3 rounded-xl text-xs font-black tracking-wide transition-all duration-300 shadow-md hover:-translate-y-1 hover:shadow-[0_4px_20px_rgba(219,39,119,0.3)] active:scale-95 group"
+                className="inline-flex items-center justify-center gap-1.5 bg-pink-600 hover:bg-pink-500 border border-pink-600 text-white px-4 py-2.5 rounded-xl text-xs font-black tracking-wide transition-all duration-300 shadow-md hover:-translate-y-0.5 active:scale-95 group"
                 aria-label="Instagram Takoyaki Siboy"
                 style={{ fontFamily: "'Montserrat', sans-serif" }}
               >
                 <svg 
                   xmlns="http://www.w3.org/2000/svg" 
-                  width="18" 
-                  height="18" 
+                  width="16" 
+                  height="16" 
                   viewBox="0 0 24 24" 
                   fill="none" 
                   stroke="currentColor" 
                   strokeWidth="2.5" 
                   strokeLinecap="round" 
                   strokeLinejoin="round" 
-                  className="w-4 h-4 group-hover:scale-110 transition-transform"
+                  className="w-3.5 h-3.5 group-hover:scale-110 transition-transform"
                 >
                   <rect width="20" height="20" x="2" y="2" rx="5" ry="5"></rect>
                   <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
                   <line x1="17.5" x2="17.51" y1="6.5" y2="6.5"></line>
                 </svg>
-                <span>@rwapaaa77</span>
+                <span>takoyaki_siboy</span>
               </a>
             </div>
 
@@ -250,7 +256,7 @@ export default function Footer() {
         </div>
 
         {/* BOTTOM CREDIT */}
-        <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-medium text-slate-500">
+        <div className="pt-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-medium text-slate-500">
           
           {/* PINTU RAHASIA: Klik 3x cepat ATAU tahan 2 detik */}
           <p 

@@ -37,7 +37,7 @@ export default function AdminDashboard() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // STATE DATA STORAGE
+  // STATE DATA STORAGE & SUPABASE
   const [prices, setPrices] = useState(INITIAL_PRICES);
   const [toppings, setToppings] = useState(INITIAL_TOPPINGS);
   const [newToppingName, setNewToppingName] = useState('');
@@ -46,13 +46,65 @@ export default function AdminDashboard() {
   const [rawHistory, setRawHistory] = useState([]);
   const [kitchenCount, setKitchenCount] = useState(0);
 
-  // 1. Inisialisasi & Sinkronisasi Storage
+  // Ambil Data Terkini dari Supabase via API
+  const fetchDbData = async () => {
+    try {
+      // 1. Ambil Semua Transaksi untuk Metrik Omzet & Grafik
+      const resOrders = await fetch('/api/orders');
+      const jsonOrders = await resOrders.json();
+      if (jsonOrders.success && Array.isArray(jsonOrders.data)) {
+        const mapped = jsonOrders.data.map(o => {
+          const createdAtDate = o.createdAt ? new Date(o.createdAt) : new Date();
+          return {
+            id: o.id,
+            timestamp: createdAtDate.getTime(),
+            date: createdAtDate.toISOString(),
+            customerName: o.customerName,
+            rawTotal: o.totalPrice || 0,
+            total: `Rp ${(o.totalPrice || 0).toLocaleString('id-ID')}`,
+            status: o.status,
+            items: (o.items || []).map(it => ({
+              name: it.menuName,
+              quantity: it.quantity,
+              qty: it.quantity,
+              price: it.price
+            }))
+          };
+        });
+        setRawHistory(mapped);
+
+        // Hitung antrean aktif di dapur (pending & cooking)
+        const activeKitchen = mapped.filter(o => {
+          const s = (o.status || '').toLowerCase();
+          return s === 'pending' || s === 'cooking' || s === 'waiting_verification';
+        }).length;
+        setKitchenCount(activeKitchen);
+      }
+
+      // 2. Ambil Daftar Menu & Harga dari Database Supabase
+      const resMenu = await fetch('/api/menu');
+      const jsonMenu = await resMenu.json();
+      if (jsonMenu.success && Array.isArray(jsonMenu.data) && jsonMenu.data.length > 0) {
+        const newPrices = { ...INITIAL_PRICES };
+        jsonMenu.data.forEach(m => {
+          if (m.slug === 'kecil') newPrices.kecil = m.price;
+          if (m.slug === 'besar') newPrices.besar = m.price;
+          if (m.slug === 'special') newPrices.special = m.price;
+        });
+        setPrices(newPrices);
+      }
+    } catch (e) {
+      console.error('Error saat sinkronisasi data dashboard:', e);
+    }
+  };
+
+  // 1. Inisialisasi & Sinkronisasi Storage & Supabase
   useEffect(() => {
     setIsMounted(true);
     const auth = localStorage.getItem('admin_auth');
     if (!auth) router.push('/admin/login');
 
-    const syncData = () => {
+    const syncLocal = () => {
       try {
         const savedStatus = localStorage.getItem('siboy_store_status');
         if (savedStatus !== null) setIsOpen(JSON.parse(savedStatus));
@@ -60,20 +112,22 @@ export default function AdminDashboard() {
         const savedDemo = localStorage.getItem('siboy_demo_mode');
         if (savedDemo !== null) setIsDemoMode(JSON.parse(savedDemo));
 
-        const savedPrices = localStorage.getItem('siboy_prices');
-        if (savedPrices) setPrices(JSON.parse(savedPrices));
-        
         const savedToppings = localStorage.getItem('siboy_toppings');
         if (savedToppings) setToppings(JSON.parse(savedToppings));
-
-        setRawHistory(JSON.parse(localStorage.getItem('siboy_order_history') || '[]'));
-        setKitchenCount(JSON.parse(localStorage.getItem('siboy_kitchen_orders') || '[]').length);
       } catch (e) {}
     };
 
-    syncData();
-    window.addEventListener('storage', syncData);
-    return () => window.removeEventListener('storage', syncData);
+    syncLocal();
+    fetchDbData();
+
+    // Polling data dashboard tiap 5 detik agar metrik selalu sinkron dengan kasir
+    const interval = setInterval(fetchDbData, 5000);
+    window.addEventListener('storage', syncLocal);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('storage', syncLocal);
+    };
   }, [router]);
 
   const toggleStoreStatus = () => {
@@ -101,7 +155,7 @@ export default function AdminDashboard() {
     return 'Hari Ini';
   };
 
-  // 2. Kalkulasi Data Transaksi Riil
+  // 2. Kalkulasi Data Transaksi Riil dari Supabase
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
@@ -133,13 +187,11 @@ export default function AdminDashboard() {
     }
 
     if (include) {
-      // Menghitung omzet riil
-      const rawVal = ord.rawTotal ?? (ord.total ? parseInt(String(ord.total).replace(/[^0-9]/g, ''), 10) : 0);
+      const rawVal = ord.rawTotal ?? 0;
       liveRev += Number(rawVal) || 0;
 
       let qtyInOrder = 0;
 
-      // Fallback deteksi menu jika dari Self-Order atau POS
       if (ord.items && Array.isArray(ord.items) && ord.items.length > 0) {
         ord.items.forEach(it => {
           const q = Number(it.qty || it.quantity || 1);
@@ -149,17 +201,6 @@ export default function AdminDashboard() {
           else if (n.includes('special')) pType.special += q;
           else pType.kecil += q;
         });
-      } else if (ord.type) {
-        const typeStr = String(ord.type).toLowerCase();
-        const parts = typeStr.split('+');
-        parts.forEach(p => {
-          const matchQty = p.match(/(\d+)\s*x/);
-          const q = matchQty ? parseInt(matchQty[1], 10) : 1;
-          qtyInOrder += q;
-          if (p.includes('besar')) pType.besar += q;
-          else if (p.includes('special')) pType.special += q;
-          else pType.kecil += q;
-        });
       } else {
         qtyInOrder = 1;
         pType.besar += 1;
@@ -167,7 +208,6 @@ export default function AdminDashboard() {
 
       liveSold += qtyInOrder;
 
-      // Sebaran Jam Ramai (16:00 - 22:00)
       const h = ordTimeObj.getHours();
       if (h >= 16 && h <= 22) {
         sHour[h] += qtyInOrder;
@@ -177,14 +217,13 @@ export default function AdminDashboard() {
         sHour[22] += qtyInOrder;
       }
 
-      // Sebaran Hari (Senin = 0 s/d Minggu = 6)
       const jsDay = ordTimeObj.getDay();
       const d = jsDay === 0 ? 6 : jsDay - 1;
       sDay[d] += qtyInOrder;
     }
   });
 
-  // 3. Kalkulasi Pengali Mode Demo
+  // 3. Pengali Mode Demo
   let mult = 1;
   if (period === 'week') mult = 7;
   if (period === 'month') mult = 30;
@@ -228,7 +267,7 @@ export default function AdminDashboard() {
     d.isPeak = d.val === maxDayVal && d.val > 0;
   });
 
-  // BUILDER GRAFIK: Tipe Kardus (Donut)
+  // BUILDER GRAFIK: Tipe Kardus
   const basePortions = { besar: Math.round(15 * mult), kecil: Math.round(9 * mult), special: Math.round(4 * mult) };
   const portionData = [
     { label: 'Porsi Besar', pcs: (isDemoMode ? basePortions.besar : 0) + pType.besar, color: '#ef4444' },
@@ -246,22 +285,28 @@ export default function AdminDashboard() {
     cumulativeOffset -= pct;
   });
 
-  // Action Drawer
-  const handlePriceChange = (key, value) => {
+  // UPDATE HARGA KE SUPABASE & LOCALSTORAGE
+  const handlePriceChange = async (key, value) => {
     const val = parseInt(value, 10) || 0;
     const updated = { ...prices, [key]: val };
     setPrices(updated);
     localStorage.setItem('siboy_prices', JSON.stringify(updated));
 
-    const menuCatalog = [
-      { id: 'M1', name: 'Porsi Kecil', pcs: '5 pcs', price: updated.kecil, desc: 'Takoyaki gurih isi 5 butir.', img: 'https://images.unsplash.com/photo-1592914610354-fd354d45fe82?q=80&w=400&auto=format&fit=crop', isAvailable: true },
-      { id: 'M2', name: 'Porsi Besar', pcs: '10 pcs', price: updated.besar, desc: 'Porsi favorit isi 10 butir kenyang.', img: 'https://images.unsplash.com/photo-1592914610354-fd354d45fe82?q=80&w=400&auto=format&fit=crop', isAvailable: true },
-      { id: 'M3', name: 'Porsi Special', pcs: '15 pcs', price: updated.special, desc: 'Porsi puas isi 15 butir melimpah.', img: 'https://images.unsplash.com/photo-1592914610354-fd354d45fe82?q=80&w=400&auto=format&fit=crop', isAvailable: true }
-    ];
-    localStorage.setItem('siboy_menus', JSON.stringify(menuCatalog));
+    // Kirim update harga ke Supabase API
+    try {
+      await fetch('/api/menu', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: key, price: val }),
+      });
+    } catch (err) {
+      console.error('Gagal update harga ke Supabase:', err);
+    }
+
     window.dispatchEvent(new Event('storage'));
   };
 
+  // UPDATE STATUS TOPPING (AMAN, MENIPIS, HABIS)
   const cycleToppingStatus = (id) => {
     const updated = toppings.map(t => {
       if (t.id === id) {
@@ -437,7 +482,7 @@ export default function AdminDashboard() {
             </div>
             <div className="pt-3 border-t border-white/20 flex items-center justify-between text-[10px] sm:text-xs font-bold text-white/90 mt-5">
               {isDemoMode && period === 'today' ? <span className="flex items-center gap-1.5"><TrendingUp className="w-3.5 h-3.5"/> +15% vs kemarin</span> : <span>Omzet {getPeriodLabel()}</span>}
-              <span className="text-white/70">Akumulasi Kasir</span>
+              <span className="text-white/70">Database Supabase</span>
             </div>
           </div>
           
@@ -646,8 +691,8 @@ export default function AdminDashboard() {
         
         <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
           <div>
-            <h2 className="text-lg font-black uppercase tracking-tight text-slate-800" style={{ fontFamily: "'Montserrat', sans-serif" }}>Pengaturan Menu</h2>
-            <p className="text-xs font-bold text-slate-400 mt-0.5">Ubah harga jual porsi & status persediaan bahan.</p>
+            <h2 className="text-lg font-black uppercase tracking-tight text-slate-800" style={{ fontFamily: "'Montserrat', sans-serif" }}>Pengaturan Menu & Stok</h2>
+            <p className="text-xs font-bold text-slate-400 mt-0.5">Ubah harga jual & status persediaan bahan langsung ke Supabase.</p>
           </div>
           <button type="button" onClick={() => setIsDrawerOpen(false)} className="w-9 h-9 bg-white border border-slate-200 rounded-full flex items-center justify-center text-slate-400 hover:text-red-500 cursor-pointer shadow-sm">
             <X className="w-4 h-4" />
@@ -658,8 +703,8 @@ export default function AdminDashboard() {
           
           <section className="space-y-3">
             <div className="border-b border-slate-100 pb-2">
-              <h3 className="text-xs font-black uppercase tracking-widest text-slate-800">Ubah Harga (Quick Sync)</h3>
-              <p className="text-[10px] font-bold text-slate-400">Harga langsung terganti di Layar Kasir POS & Self-Order</p>
+              <h3 className="text-xs font-black uppercase tracking-widest text-slate-800">Ubah Harga Menu</h3>
+              <p className="text-[10px] font-bold text-slate-400">Tersinkron langsung ke Supabase & Layar Kasir POS</p>
             </div>
 
             <div className="space-y-3">
@@ -701,7 +746,7 @@ export default function AdminDashboard() {
           <section className="space-y-4">
             <div className="border-b border-slate-100 pb-2">
               <h3 className="text-xs font-black uppercase tracking-widest text-slate-800">Kelola Bahan Topping</h3>
-              <p className="text-[10px] font-bold text-slate-400">Status bahan langsung tersinkron ke opsi pelanggan</p>
+              <p className="text-[10px] font-bold text-slate-400">Bahan 'Habis' otomatis terkunci dan tidak bisa dipilih kasir</p>
             </div>
 
             <div className="flex gap-2">

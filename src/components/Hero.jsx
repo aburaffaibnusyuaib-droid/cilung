@@ -219,7 +219,7 @@ export default function Hero({ onOrderClick }) {
                 </div>
                 <div className="text-left">
                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Lokasi Netap</p>
-                  <p className="text-[10px] sm:text-xs font-bold text-slate-900 leading-none mt-0.5">Depan SMKN 65</p>
+                  <p className="text-[10px] sm:text-xs font-bold text-slate-900 leading-none mt-0.5">Depan SMKN 50 JAKARTA</p>
                 </div>
               </a>
 

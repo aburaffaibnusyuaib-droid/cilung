@@ -9,8 +9,22 @@ const DEFAULT_PRICES = { kecil: 6000, besar: 12000, special: 17000 };
 export default function Menu({ onSelectPackage }) {
   const [prices, setPrices] = useState(DEFAULT_PRICES);
 
-  useEffect(() => {
-    const syncPrices = () => {
+  // Ambil data harga riil dari Supabase via API
+  const fetchMenuFromDb = async () => {
+    try {
+      const res = await fetch('/api/menu');
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+        const updated = { ...DEFAULT_PRICES };
+        json.data.forEach((m) => {
+          if (m.slug === 'kecil') updated.kecil = m.price;
+          if (m.slug === 'besar') updated.besar = m.price;
+          if (m.slug === 'special') updated.special = m.price;
+        });
+        setPrices(updated);
+      }
+    } catch (e) {
+      // Fallback ke localStorage jika koneksi terhambat
       try {
         const saved = localStorage.getItem('siboy_prices');
         if (saved) {
@@ -18,20 +32,26 @@ export default function Menu({ onSelectPackage }) {
           setPrices({
             kecil: parsed.kecil || DEFAULT_PRICES.kecil,
             besar: parsed.besar || DEFAULT_PRICES.besar,
-            special: parsed.special || DEFAULT_PRICES.special
+            special: parsed.special || DEFAULT_PRICES.special,
           });
         }
-      } catch (e) {}
-    };
+      } catch (err) {}
+    }
+  };
 
-    syncPrices();
-    window.addEventListener('storage', syncPrices);
-    return () => window.removeEventListener('storage', syncPrices);
+  useEffect(() => {
+    fetchMenuFromDb();
+
+    // Listener jika admin mengubah harga di tab dashboard
+    const handleStorageChange = () => fetchMenuFromDb();
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   const menuList = [
     {
       id: 'kecil',
+      slug: 'kecil',
       name: 'PORSI KECIL',
       pcs: '5 PCS',
       price: `Rp ${prices.kecil.toLocaleString('id-ID')}`,
@@ -41,6 +61,7 @@ export default function Menu({ onSelectPackage }) {
     },
     {
       id: 'besar',
+      slug: 'besar',
       name: 'PORSI BESAR',
       pcs: '10 PCS',
       price: `Rp ${prices.besar.toLocaleString('id-ID')}`,
@@ -50,6 +71,7 @@ export default function Menu({ onSelectPackage }) {
     },
     {
       id: 'special',
+      slug: 'special',
       name: 'PORSI SPECIAL',
       pcs: '15 PCS',
       price: `Rp ${prices.special.toLocaleString('id-ID')}`,
@@ -60,13 +82,16 @@ export default function Menu({ onSelectPackage }) {
   ];
 
   return (
-    <section id="menu" className="w-full pt-32 pb-24 sm:pt-36 sm:pb-28 relative overflow-hidden scroll-mt-16 bg-[#dc2626]">
-      
+    <section
+      id="menu"
+      className="w-full pt-32 pb-36 sm:pt-36 sm:pb-44 relative overflow-hidden scroll-mt-16 bg-[#dc2626]"
+    >
       {/* ================= 1. SUNBURST JEPANG BACKGROUND ================= */}
-      <div 
+      <div
         className="absolute inset-0 opacity-20 pointer-events-none"
         style={{
-          background: 'repeating-conic-gradient(from 0deg, transparent 0deg 12deg, rgba(0, 0, 0, 0.18) 12deg 24deg)'
+          background:
+            'repeating-conic-gradient(from 0deg, transparent 0deg 12deg, rgba(0, 0, 0, 0.18) 12deg 24deg)',
         }}
       />
 
@@ -77,7 +102,7 @@ export default function Menu({ onSelectPackage }) {
       <div className="absolute right-[-2%] top-1/3 text-[12rem] sm:text-[18rem] font-black text-amber-300/[0.09] select-none pointer-events-none leading-none rotate-12 font-serif">
         蛸
       </div>
-      <div className="absolute left-1/2 -translate-x-1/2 bottom-2 text-[8rem] sm:text-[13rem] font-black text-white/[0.04] select-none pointer-events-none leading-none font-serif whitespace-nowrap">
+      <div className="absolute left-1/2 -translate-x-1/2 bottom-16 sm:bottom-20 text-[8rem] sm:text-[13rem] font-black text-white/[0.04] select-none pointer-events-none leading-none font-serif whitespace-nowrap">
         たこ焼き
       </div>
 
@@ -95,7 +120,7 @@ export default function Menu({ onSelectPackage }) {
       </div>
 
       <svg
-        className="absolute bottom-6 left-6 sm:left-20 w-24 sm:w-32 h-24 sm:h-32 text-amber-300/[0.14] pointer-events-none rotate-12"
+        className="absolute bottom-16 left-6 sm:left-20 w-24 sm:w-32 h-24 sm:h-32 text-amber-300/[0.14] pointer-events-none rotate-12"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -110,7 +135,7 @@ export default function Menu({ onSelectPackage }) {
       </svg>
 
       <svg
-        className="absolute bottom-8 right-6 sm:right-20 w-28 sm:w-36 h-28 sm:h-36 text-black/[0.12] pointer-events-none -rotate-12"
+        className="absolute bottom-20 right-6 sm:right-20 w-28 sm:w-36 h-28 sm:h-36 text-black/[0.12] pointer-events-none -rotate-12"
         viewBox="0 0 24 24"
         fill="currentColor"
       >
@@ -125,7 +150,6 @@ export default function Menu({ onSelectPackage }) {
 
       {/* ================= 4. KONTEN UTAMA ================= */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 w-full relative z-10">
-        
         {/* Header Section */}
         <div className="text-center mb-12 flex flex-col items-center">
           <div className="relative inline-block px-10 py-2">
@@ -142,7 +166,7 @@ export default function Menu({ onSelectPackage }) {
               />
             </svg>
 
-            <h2 
+            <h2
               className="relative z-10 text-4xl sm:text-5xl font-black text-white tracking-tighter uppercase leading-none drop-shadow-md"
               style={{ fontFamily: "'Montserrat', sans-serif" }}
             >
@@ -150,8 +174,8 @@ export default function Menu({ onSelectPackage }) {
             </h2>
           </div>
 
-          <p 
-            className="text-white/95 text-[11px] sm:text-sm font-bold uppercase tracking-widest mt-6 drop-shadow-sm"
+          <p
+            className="text-white/95 text-[11px] sm:text-sm font-bold uppercase tracking-widest mt-6 drop-shadow-xs"
             style={{ fontFamily: "'Montserrat', sans-serif" }}
           >
             Dibuat fresh langsung dari wajan panggang setiap hari
@@ -159,7 +183,7 @@ export default function Menu({ onSelectPackage }) {
         </div>
 
         {/* Grid Kartu Menu */}
-        <div className="flex sm:grid sm:grid-cols-3 gap-4 sm:gap-6 overflow-x-auto sm:overflow-visible pb-8 snap-x snap-mandatory -mx-4 px-4 sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        <div className="flex sm:grid sm:grid-cols-3 gap-4 sm:gap-6 overflow-x-auto sm:overflow-visible pb-4 snap-x snap-mandatory -mx-4 px-4 sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           {menuList.map((item) => (
             <div
               key={item.id}
@@ -171,11 +195,12 @@ export default function Menu({ onSelectPackage }) {
                   src={item.image}
                   alt={item.name}
                   fill
+                  sizes="(max-width: 640px) 78vw, 300px"
                   className="object-cover object-center transition-transform duration-500 group-hover:scale-105"
                 />
-                
+
                 {item.badge && (
-                  <div 
+                  <div
                     className="absolute top-3 right-3 bg-amber-400 text-slate-950 font-black text-[9px] px-2.5 py-1.5 rounded-full shadow-md uppercase tracking-wider flex items-center gap-1 z-10"
                     style={{ fontFamily: "'Montserrat', sans-serif" }}
                   >
@@ -187,13 +212,13 @@ export default function Menu({ onSelectPackage }) {
 
               <div className="p-5 flex flex-col flex-grow">
                 <div className="flex items-start justify-between gap-2 mb-2">
-                  <h3 
+                  <h3
                     className="text-lg sm:text-xl font-black text-slate-900 tracking-tight uppercase leading-none mt-0.5"
                     style={{ fontFamily: "'Montserrat', sans-serif" }}
                   >
                     {item.name}
                   </h3>
-                  <span 
+                  <span
                     className="text-[10px] font-black bg-slate-100 text-slate-600 px-2 py-1 rounded-[6px] uppercase tracking-wider shrink-0"
                     style={{ fontFamily: "'Montserrat', sans-serif" }}
                   >
@@ -202,7 +227,7 @@ export default function Menu({ onSelectPackage }) {
                 </div>
 
                 <div className="mt-auto pt-4 border-t border-slate-100">
-                  <span 
+                  <span
                     className="text-2xl font-black text-red-600 tracking-tight"
                     style={{ fontFamily: "'Montserrat', sans-serif" }}
                   >
@@ -213,7 +238,20 @@ export default function Menu({ onSelectPackage }) {
             </div>
           ))}
         </div>
+      </div>
 
+      {/* ================= 5. ORGANIC CURVE TRANSITION ================= */}
+      <div className="absolute bottom-0 left-0 right-0 w-full overflow-hidden leading-none pointer-events-none z-10">
+        <svg
+          className="relative block w-full h-12 sm:h-20 text-[#faf9f6]"
+          viewBox="0 0 1200 120"
+          preserveAspectRatio="none"
+        >
+          <path
+            d="M0,0 C250,90 450,110 600,95 C850,75 1020,25 1200,50 L1200,120 L0,120 Z"
+            fill="currentColor"
+          />
+        </svg>
       </div>
     </section>
   );

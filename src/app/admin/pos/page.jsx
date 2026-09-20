@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
 import { 
   Search, X, Plus, Minus, Check, Ban, Leaf, Flame, Store, 
@@ -25,7 +24,7 @@ const CheeseWedgeIcon = ({ className = 'w-4.5 h-4.5' }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 18h18L18 8 3 13v5z" /><path d="M3 13l15-5" /><circle cx="8" cy="15.5" r="1" fill="currentColor" /><circle cx="14" cy="14" r="1.3" fill="currentColor" /><circle cx="12" cy="11" r="0.8" fill="currentColor" /></svg>
 );
 const KatsuobushiIcon = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M5 8c3-3 7 0 9-1s4 4 1 5-6 1-8 3-4-4-2-7z" /><path d="M11 16c2-2 5 0 7-1" /></svg>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M5 8c3-3 7 0 9-1s4 4 1 5-6 1-8 3-4-4-2-7z" /><path d="M11 16c2-2 5 0 7-1" /></svg>
 );
 const TomatoIcon = ({ className = 'w-4 h-4' }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="14" r="7.5" /><path d="M12 6.5V3" /><path d="M9.5 5.5c1.5 1 2.5 1 2.5 1s1 0 2.5-1" /></svg>
@@ -50,7 +49,7 @@ function MenuModal({ product, editingItem, toppingsStock, onClose, onSave }) {
 
   const [quantity, setQuantity] = useState(editingItem ? editingItem.qty : 1);
   const [selectedToppings, setSelectedToppings] = useState(
-    editingItem?.customs?.toppings?.filter(t => !t.includes('Polos')) || []
+    editingItem?.customs?.toppings?.filter((t) => !t.includes('Polos')) || []
   );
   const [pakaiSayur, setPakaiSayur] = useState(
     editingItem ? !editingItem.customs.veg.includes('Tanpa') : true
@@ -105,8 +104,8 @@ function MenuModal({ product, editingItem, toppingsStock, onClose, onSave }) {
         veg: pakaiSayur ? 'Pakai Sayur (Kol & Daun Bawang)' : 'Tanpa Sayur',
         sauce: selectedSaus.length > 0 ? selectedSaus : ['Tanpa Saus'],
         spicyLevel: selectedSaus.includes('pedas') ? spicyLevel : null,
-        note: catatan
-      }
+        note: catatan,
+      },
     };
     onSave(payload, !!editingItem);
     onClose();
@@ -148,7 +147,7 @@ function MenuModal({ product, editingItem, toppingsStock, onClose, onSave }) {
                 return (
                   <button 
                     key={topping.id} 
-                    type="button"
+                    type="button" 
                     disabled={isHabis}
                     onClick={() => handleToggleTopping(topping.name)} 
                     className={`group py-2.5 px-3 rounded-xl sm:rounded-2xl border-2 transition-all duration-200 flex items-center justify-between text-left ${
@@ -242,7 +241,7 @@ function MenuModal({ product, editingItem, toppingsStock, onClose, onSave }) {
               <div className="bg-red-50 p-3 rounded-xl border-2 border-red-100 flex flex-col justify-center mt-2">
                 <p className="text-[10px] font-black uppercase tracking-widest text-red-700 mb-1.5">Level Kepedasan</p>
                 <div className="flex gap-1.5 sm:gap-2">
-                  {['Level 1', 'Level 2', 'Level 3'].map(lvl => (
+                  {['Level 1', 'Level 2', 'Level 3'].map((lvl) => (
                     <button 
                       key={lvl} 
                       type="button" 
@@ -293,53 +292,24 @@ function MenuModal({ product, editingItem, toppingsStock, onClose, onSave }) {
 
 /* ================= HALAMAN KASIR POS UTAMA ================= */
 export default function POSPage() {
-  const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
 
   const [baseUrl, setBaseUrl] = useState('');
-  const [prices, setPrices] = useState({ kecil: 6000, besar: 12000, special: 17000 });
-  const [toppingsStock, setToppingsStock] = useState([]);
+  const [catalogMenus, setCatalogMenus] = useState([
+    { id: 'M1', name: 'Porsi Kecil', pcs: '5 pcs', price: 6000, desc: 'Takoyaki gurih hangat 5 butir.', badge: 'Camilan', emoji: '🍢' },
+    { id: 'M2', name: 'Porsi Besar', pcs: '10 pcs', price: 12000, desc: 'Porsi favorit 10 butir mantap kenyang.', badge: 'Paling Laris', emoji: '🐙' },
+    { id: 'M3', name: 'Porsi Special', pcs: '15 pcs', price: 17000, desc: 'Porsi puas 15 butir melimpah rame-rame.', badge: 'Porsi Puas', emoji: '🔥' }
+  ]);
+  const [toppingsStock, setToppingsStock] = useState([
+    { id: 1, name: 'Katsuobushi', status: 'Aman' },
+    { id: 2, name: 'Keju Mozza', status: 'Aman' },
+    { id: 3, name: 'Sosis Ayam', status: 'Menipis' },
+    { id: 4, name: 'Crabstick', status: 'Aman' },
+    { id: 5, name: 'Kornet Gurih', status: 'Habis' }
+  ]);
   const [searchTerm, setSearchTerm] = useState('');
-
-  const catalogMenus = [
-    { id: 'M1', name: 'Porsi Kecil', pcs: '5 pcs', price: prices.kecil, desc: 'Takoyaki gurih hangat 5 butir.', badge: 'Camilan', emoji: '🍢' },
-    { id: 'M2', name: 'Porsi Besar', pcs: '10 pcs', price: prices.besar, desc: 'Porsi favorit 10 butir mantap kenyang.', badge: 'Paling Laris', emoji: '🐙' },
-    { id: 'M3', name: 'Porsi Special', pcs: '15 pcs', price: prices.special, desc: 'Porsi puas 15 butir melimpah rame-rame.', badge: 'Porsi Puas', emoji: '🔥' }
-  ];
-
-  useEffect(() => {
-    setIsMounted(true);
-    setBaseUrl(window.location.origin);
-    
-    const auth = localStorage.getItem('admin_auth');
-    if (!auth) router.push('/admin/login');
-
-    const syncWithDashboard = () => {
-      try {
-        const savedPrices = localStorage.getItem('siboy_prices');
-        if (savedPrices) setPrices(JSON.parse(savedPrices));
-
-        const savedToppings = localStorage.getItem('siboy_toppings');
-        if (savedToppings) {
-          setToppingsStock(JSON.parse(savedToppings));
-        } else {
-          setToppingsStock([
-            { id: 1, name: 'Katsuobushi', status: 'Aman' },
-            { id: 2, name: 'Keju Mozza', status: 'Aman' },
-            { id: 3, name: 'Sosis Ayam', status: 'Menipis' },
-            { id: 4, name: 'Crabstick', status: 'Aman' },
-            { id: 5, name: 'Kornet Gurih', status: 'Habis' }
-          ]);
-        }
-      } catch (e) {}
-    };
-
-    syncWithDashboard();
-    window.addEventListener('storage', syncWithDashboard);
-    return () => window.removeEventListener('storage', syncWithDashboard);
-  }, [router]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [cart, setCart] = useState([]);
   const [customerName, setCustomerName] = useState('');
@@ -351,15 +321,74 @@ export default function POSPage() {
   const [paymentMode, setPaymentMode] = useState(null);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [queueNumber, setQueueNumber] = useState(1);
+  
+  // Nomor antrean harian otomatis (#01, #02, dst)
+  const [queueDisplay, setQueueDisplay] = useState('#01');
   const [lastOrderId, setLastOrderId] = useState('');
+
+  // Sinkronkan nomor antrean hari ini dari Supabase
+  const syncTodayQueue = async () => {
+    try {
+      const res = await fetch('/api/orders?action=next_queue');
+      const json = await res.json();
+      if (json.success) {
+        setQueueDisplay(json.formattedQ);
+      }
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setBaseUrl(window.location.origin);
+      localStorage.setItem('admin_auth', 'true');
+
+      try {
+        const savedToppings = localStorage.getItem('siboy_toppings');
+        if (savedToppings) {
+          setToppingsStock(JSON.parse(savedToppings));
+        }
+      } catch (e) {}
+    }
+
+    syncTodayQueue();
+
+    fetch('/api/menu')
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          const formatted = json.data.map((m) => ({
+            id: m.id,
+            slug: m.slug,
+            name: m.name,
+            pcs: m.pcs,
+            price: m.price,
+            desc:
+              m.slug === 'kecil'
+                ? 'Takoyaki gurih hangat 5 butir.'
+                : m.slug === 'besar'
+                ? 'Porsi favorit 10 butir mantap kenyang.'
+                : 'Porsi puas 15 butir melimpah rame-rame.',
+            badge:
+              m.badge ||
+              (m.slug === 'besar'
+                ? 'Paling Laris'
+                : m.slug === 'kecil'
+                ? 'Camilan'
+                : 'Porsi Puas'),
+            emoji: m.slug === 'kecil' ? '🍢' : m.slug === 'besar' ? '🐙' : '🔥',
+          }));
+          setCatalogMenus(formatted);
+        }
+      })
+      .catch((err) => console.error(err));
+  }, []);
 
   const handleSaveMenu = (itemData, isEditing) => {
     if (isEditing) {
-      setCart(cart.map(item => item.cartId === itemData.cartId ? itemData : item));
+      setCart((prev) => prev.map((item) => (item.cartId === itemData.cartId ? itemData : item)));
       setEditingItem(null);
     } else {
-      setCart([...cart, itemData]);
+      setCart((prev) => [...prev, itemData]);
       setSelectedProduct(null);
     }
   };
@@ -369,17 +398,22 @@ export default function POSPage() {
     setIsMobileCartOpen(false);
   };
 
-  const updateQty = (cartId, delta) => setCart(cart.map(item => item.cartId === cartId ? { ...item, qty: Math.max(1, item.qty + delta) } : item));
-  const removeFromCart = (cartId) => setCart(cart.filter(item => item.cartId !== cartId));
-  const totalAkhir = cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
+  const updateQty = (cartId, delta) =>
+    setCart((prev) =>
+      prev.map((item) =>
+        item.cartId === cartId ? { ...item, qty: Math.max(1, item.qty + delta) } : item
+      )
+    );
+  const removeFromCart = (cartId) => setCart((prev) => prev.filter((item) => item.cartId !== cartId));
+  const totalAkhir = cart.reduce((acc, item) => acc + item.price * item.qty, 0);
   const totalItemsCount = cart.reduce((acc, item) => acc + item.qty, 0);
 
   const initPayment = (mode) => {
-    if (cart.length === 0) return alert("Keranjang belanja masih kosong!");
+    if (cart.length === 0) return alert('Keranjang belanja masih kosong!');
     
     let resolvedName = customerName.trim();
     if (!resolvedName) {
-      resolvedName = `Pelanggan #${String(queueNumber).padStart(2, '0')}`;
+      resolvedName = `Pelanggan ${queueDisplay}`;
       setCustomerName(resolvedName);
     }
 
@@ -388,42 +422,89 @@ export default function POSPage() {
     else setPaymentAmount('');
   };
 
-  const processPayment = () => {
+  const processPayment = async () => {
     if (paymentMode === 'cash' && Number(paymentAmount) < totalAkhir) {
-      return alert("Nominal uang tunai kurang!");
+      return alert('Nominal uang tunai kurang!');
     }
 
-    const resolvedName = customerName.trim() || `Pelanggan #${String(queueNumber).padStart(2, '0')}`;
-    const orderId = `SB-${Date.now().toString().slice(-4)}`;
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
+    // Dapatkan Order ID unik dan nomor antrean hari ini
+    let currentQueueStr = queueDisplay;
+    let orderId = `SB-${Date.now().toString().slice(-4)}`;
+
+    try {
+      const qRes = await fetch('/api/orders?action=next_queue');
+      const qJson = await qRes.json();
+      if (qJson.success) {
+        currentQueueStr = qJson.formattedQ;
+        orderId = qJson.generatedOrderId;
+      }
+    } catch (e) {}
+
+    const resolvedName = customerName.trim() || `Pelanggan ${currentQueueStr}`;
     const now = new Date();
     const formattedDate = now.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
     const formattedTime = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-    const formattedQNo = `#${String(queueNumber).padStart(2, '0')}`;
 
+    const formattedDbItems = cart.map((item) => {
+      const topStr = item.customs.toppings.join(', ');
+      const sausStr =
+        item.customs.sauce.join(', ') +
+        (item.customs.spicyLevel ? ` (${item.customs.spicyLevel})` : '');
+      const vegStr = item.customs.veg;
+      const racikanDesc = `(${topStr} | ${vegStr} | ${sausStr})`;
+
+      return {
+        name: `${item.name} ${racikanDesc}`,
+        quantity: item.qty,
+        price: item.price,
+      };
+    });
+
+    const combinedNotes = cart.map((item) => item.customs.note).filter(Boolean).join('; ');
+    const finalNotes = `[${currentQueueStr}] ${combinedNotes ? combinedNotes + ' | ' : ''}Metode: ${paymentMode === 'cash' ? 'TUNAI' : 'QRIS'}`;
+
+    // 1. Simpan ke Supabase dengan status 'pending'
+    try {
+      await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: orderId,
+          customerName: `${resolvedName} (${orderType})`,
+          totalPrice: totalAkhir,
+          status: 'pending',
+          notes: finalNotes,
+          items: formattedDbItems,
+        }),
+      });
+    } catch (e) {
+      console.error('Error saat menyimpan ke Supabase:', e);
+    }
+
+    // 2. Sinkronkan ke memory localStorage untuk fallback
     const newKitchenOrder = {
       id: orderId,
-      qNo: formattedQNo,
+      qNo: currentQueueStr,
       time: formattedTime,
       timer: 'Baru Masuk',
       status: 'pending',
       name: resolvedName,
       customerName: resolvedName,
-      type: cart.map(item => `${item.qty}x ${item.name}`).join(' + '),
-      toppings: cart.flatMap(item => item.customs.toppings).filter((v, i, a) => a.indexOf(v) === i).join(', '),
+      type: cart.map((item) => `${item.qty}x ${item.name}`).join(' + '),
+      toppings: cart.flatMap((item) => item.customs.toppings).filter((v, i, a) => a.indexOf(v) === i).join(', '),
       veg: cart[0]?.customs.veg || 'Pakai Sayur',
       spicy: cart[0]?.customs.spicyLevel ? `Pedas (${cart[0].customs.spicyLevel})` : 'Normal',
-      note: cart.map(item => item.customs.note).filter(Boolean).join('; '),
+      note: finalNotes,
       total: `Rp ${totalAkhir.toLocaleString('id-ID')}`,
       pay: paymentMode === 'cash' ? 'CASH' : 'QRIS',
-      items: cart.map(item => ({
+      items: cart.map((item) => ({
         name: item.name,
         qty: item.qty,
         price: item.price,
-        toppings: item.customs.toppings.join(', '),
-        veg: item.customs.veg,
-        spicy: item.customs.spicyLevel ? `Pedas (${item.customs.spicyLevel})` : 'Normal',
-        note: item.customs.note || ''
-      }))
+      })),
     };
 
     try {
@@ -431,69 +512,39 @@ export default function POSPage() {
       localStorage.setItem('siboy_kitchen_orders', JSON.stringify([...existingKitchen, newKitchenOrder]));
     } catch (e) {}
 
-    const newHistoryEntry = {
-      id: orderId,
-      timestamp: now.getTime(),
-      date: formattedDate,
-      time: formattedTime,
-      name: resolvedName,
-      customerName: resolvedName,
-      type: cart.map(item => `${item.qty}x ${item.name}`).join(' + '),
-      items: cart.map(item => ({
-        name: item.name,
-        qty: item.qty,
-        price: item.price,
-        toppings: item.customs.toppings.join(', '),
-        veg: item.customs.veg,
-        spicy: item.customs.spicyLevel ? `Pedas (${item.customs.spicyLevel})` : 'Normal',
-        note: item.customs.note || ''
-      })),
-      toppings: cart.flatMap(item => item.customs.toppings).filter((v, i, a) => a.indexOf(v) === i).join(', '),
-      veg: cart[0]?.customs.veg || 'Pakai Sayur',
-      spicy: cart[0]?.customs.spicyLevel ? `Pedas (${cart[0].customs.spicyLevel})` : 'Normal',
-      total: `Rp ${totalAkhir.toLocaleString('id-ID')}`,
-      rawTotal: totalAkhir,
-      pay: paymentMode === 'cash' ? 'CASH' : 'QRIS',
-      stat: 'Selesai'
-    };
-
-    try {
-      const existingHistory = JSON.parse(localStorage.getItem('siboy_order_history') || '[]');
-      localStorage.setItem('siboy_order_history', JSON.stringify([newHistoryEntry, ...existingHistory]));
-      window.dispatchEvent(new Event('storage'));
-    } catch (e) {}
-
     setLastOrderId(orderId);
+    setQueueDisplay(currentQueueStr);
     setPaymentMode(null);
     setIsMobileCartOpen(false);
     setShowSuccessModal(true);
+    setIsSubmitting(false);
   };
 
   const resetOrder = () => {
     setCart([]); 
     setCustomerName(''); 
     setPaymentAmount(''); 
-    setQueueNumber(prev => prev + 1); 
     setShowSuccessModal(false);
+    syncTodayQueue(); // Ambil nomor antrean berikutnya dari server
   };
 
   const formatSaus = (sauceArr, level) => {
-    const labels = sauceArr.map(s => s === 'pedas' ? 'Saus Pedas' : s === 'tomat' ? 'Saus Tomat' : s === 'mayones' ? 'Mayones' : 'Tanpa Saus');
+    const labels = sauceArr.map((s) =>
+      s === 'pedas' ? 'Saus Pedas' : s === 'tomat' ? 'Saus Tomat' : s === 'mayones' ? 'Mayones' : 'Tanpa Saus'
+    );
     let text = labels.join(' + ');
     if (level) text += ` (${level})`;
     return text;
   };
 
-  const filteredMenus = catalogMenus.filter(item => 
+  const filteredMenus = catalogMenus.filter((item) =>
     item.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const displayCustomer = customerName.trim() || `Pelanggan #${String(queueNumber).padStart(2, '0')}`;
+  const displayCustomer = customerName.trim() || `Pelanggan ${queueDisplay}`;
 
-  // Komponen Isi Keranjang (Reused untuk Desktop & Mobile Bottom Sheet)
   const CartInnerContent = ({ isMobile = false }) => (
     <div className="w-full h-full bg-white flex flex-col overflow-hidden">
-      {/* Header Keranjang dengan Atas Nama */}
       <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
         <div className="flex items-center gap-2.5 min-w-0 pr-2">
           <div className="w-8 h-8 bg-amber-100 text-amber-700 rounded-xl flex items-center justify-center shadow-xs shrink-0">
@@ -503,7 +554,7 @@ export default function POSPage() {
             <div className="flex items-center gap-1.5 flex-wrap">
               <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 leading-none">Rincian Menu</h3>
               <span className="text-[9px] font-black uppercase px-1.5 py-0.5 bg-amber-50 text-amber-900 border border-amber-200 rounded truncate max-w-[140px]">
-                A/N: {displayCustomer}
+                {queueDisplay} • {displayCustomer}
               </span>
             </div>
             <p className="text-[9.5px] font-bold text-slate-400 mt-1 uppercase tracking-wide">
@@ -525,7 +576,7 @@ export default function POSPage() {
           {isMobile && (
             <button 
               type="button" 
-              onClick={() => setIsMobileCartOpen(false)}
+              onClick={() => setIsMobileCartOpen(false)} 
               className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center active:scale-90 cursor-pointer"
             >
               <X className="w-4 h-4" />
@@ -534,7 +585,6 @@ export default function POSPage() {
         </div>
       </div>
 
-      {/* List Item Keranjang + Tombol EDIT */}
       <div className="flex-1 overflow-y-auto p-4 space-y-2.5 bg-white [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         {cart.length === 0 ? (
           <div className="h-full py-16 flex flex-col items-center justify-center text-slate-300 gap-2">
@@ -604,7 +654,6 @@ export default function POSPage() {
         )}
       </div>
 
-      {/* Footer Checkout Panel */}
       <div className="p-4 bg-white border-t border-slate-100 shrink-0 shadow-xs">
         <div className="flex justify-between items-end mb-3">
           <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Tagihan:</span>
@@ -633,17 +682,15 @@ export default function POSPage() {
 
   return (
     <div className="min-h-screen bg-[#faf9f6] text-slate-900 flex flex-col lg:flex-row relative" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-      
       <div className="absolute inset-0 pointer-events-none z-0" style={{ backgroundSize: '32px 32px', backgroundImage: 'linear-gradient(to right, rgba(0, 0, 0, 0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(0, 0, 0, 0.04) 1px, transparent 1px)' }} />
 
-      {/* ================= AREA KIRI: KATALOG MENU ================= */}
+      {/* AREA KIRI: KATALOG MENU */}
       <div className="flex-1 flex flex-col min-h-screen relative z-10 lg:pr-[410px] w-full">
         
-        {/* Header Terminal Kasir */}
         <div className="px-3.5 sm:px-8 py-3 flex items-center justify-between shrink-0 bg-white/95 backdrop-blur-md border-b border-slate-100 sticky top-0 z-30">
           <div className="flex items-center gap-2.5">
             <button 
-              type="button"
+              type="button" 
               onClick={() => setIsSidebarOpen(true)} 
               className="w-10 h-10 bg-white text-slate-800 hover:bg-slate-100 border-2 border-slate-100 rounded-xl transition-all flex items-center justify-center shadow-xs cursor-pointer active:scale-95"
             >
@@ -657,7 +704,9 @@ export default function POSPage() {
                 <h2 className="text-sm sm:text-base font-black uppercase tracking-tight leading-none text-slate-800" style={{ fontFamily: "'Montserrat', sans-serif" }}>
                   SIBOY<span className="text-amber-500">POS</span>
                 </h2>
-                <p className="text-[8px] font-bold uppercase tracking-widest text-slate-400 mt-0.5">Terminal Kasir</p>
+                <p className="text-[8px] font-bold uppercase tracking-widest text-slate-400 mt-0.5">
+                  Terminal Kasir • Antrean Hari Ini: <span className="text-amber-600 font-black">{queueDisplay}</span>
+                </p>
               </div>
             </div>
           </div>
@@ -668,13 +717,12 @@ export default function POSPage() {
               <input 
                 type="text" 
                 placeholder="Cari..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                value={searchTerm} 
+                onChange={(e) => setSearchTerm(e.target.value)} 
                 className="w-full bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 rounded-full pl-8 pr-2.5 py-1.5 outline-none focus:border-slate-800" 
               />
             </div>
 
-            {/* Tombol Keranjang Mobile di Navbar Atas */}
             <button
               type="button"
               onClick={() => setIsMobileCartOpen(true)}
@@ -722,15 +770,15 @@ export default function POSPage() {
             <User className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input 
               type="text" 
-              placeholder="Nama Pelanggan (Default: Pelanggan #01)..." 
+              placeholder={`Nama Pelanggan (Default: Pelanggan ${queueDisplay})...`} 
               value={customerName} 
               onChange={(e) => setCustomerName(e.target.value)} 
-              className="w-full bg-slate-50 border-2 border-slate-200 text-xs font-bold text-slate-800 rounded-xl pl-8 pr-3 py-1.5 outline-none focus:border-slate-800"
+              className="w-full bg-slate-50 border-2 border-slate-200 text-xs font-bold text-slate-800 rounded-xl pl-8 pr-3 py-1.5 outline-none focus:border-slate-800" 
             />
           </div>
         </div>
 
-        {/* KATALOG 3 MENU */}
+        {/* KATALOG MENU */}
         <div className="flex-1 p-3.5 sm:p-8 pb-32 lg:pb-8">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 max-w-5xl">
             {filteredMenus.map((item) => (
@@ -763,8 +811,8 @@ export default function POSPage() {
                     <span className="text-[8px] font-bold text-slate-400 block uppercase">Harga</span>
                     <span className="text-base font-black text-red-600">Rp {item.price.toLocaleString('id-ID')}</span>
                   </div>
-                  <button
-                    type="button"
+                  <button 
+                    type="button" 
                     className="w-8 h-8 rounded-full bg-slate-50 border border-slate-200 group-hover:bg-red-600 group-hover:text-white group-hover:border-red-600 flex items-center justify-center text-slate-700 transition-colors shadow-xs"
                   >
                     <Plus className="w-4 h-4 stroke-[2.5]" />
@@ -780,7 +828,7 @@ export default function POSPage() {
           <div className="lg:hidden fixed bottom-3 inset-x-3 z-[130] animate-in slide-in-from-bottom-4 duration-300">
             <div className="bg-slate-950 text-white rounded-2xl p-3 shadow-2xl border-2 border-slate-800 space-y-2.5">
               <div 
-                onClick={() => setIsMobileCartOpen(true)}
+                onClick={() => setIsMobileCartOpen(true)} 
                 className="flex items-center justify-between px-1 cursor-pointer active:opacity-80"
               >
                 <div className="flex items-center gap-2">
@@ -789,7 +837,7 @@ export default function POSPage() {
                   </span>
                   <div>
                     <span className="text-[10px] font-black uppercase text-amber-300 flex items-center gap-1">
-                      A/N: {displayCustomer} <ChevronUp className="w-3 h-3" />
+                      {queueDisplay} • {displayCustomer} <ChevronUp className="w-3 h-3" />
                     </span>
                     <span className="text-[8.5px] font-bold text-slate-400 uppercase">
                       {orderType} • Ketuk untuk Cek Menu
@@ -819,35 +867,32 @@ export default function POSPage() {
             </div>
           </div>
         )}
-
       </div>
 
-      {/* ================= PANEL CART DESKTOP (PERMANEN DI KANAN) ================= */}
+      {/* PANEL CART DESKTOP */}
       <div className="hidden lg:block fixed inset-y-0 right-0 w-[410px] p-4 z-40">
         <div className="w-full h-full rounded-[2rem] shadow-2xl border-2 border-slate-100 overflow-hidden">
           <CartInnerContent isMobile={false} />
         </div>
       </div>
 
-      {/* ================= DRAWER CART MOBILE (BOTTOM SHEET EKSPLISIT) ================= */}
+      {/* DRAWER CART MOBILE */}
       {isMobileCartOpen && (
         <div className="lg:hidden fixed inset-0 z-[150] flex flex-col justify-end">
-          {/* Backdrop gelap */}
           <div 
             className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs transition-opacity" 
             onClick={() => setIsMobileCartOpen(false)} 
           />
-          {/* Kartu laci putih di bawah */}
           <div className="relative z-10 w-full h-[85vh] bg-white rounded-t-[2rem] shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom duration-300">
             <CartInnerContent isMobile={true} />
           </div>
         </div>
       )}
 
-      {/* MODAL RACIKAN BARU ATAU EDIT */}
+      {/* MODAL RACIKAN */}
       <MenuModal 
         product={selectedProduct} 
-        editingItem={editingItem}
+        editingItem={editingItem} 
         toppingsStock={toppingsStock} 
         onClose={() => {
           setSelectedProduct(null);
@@ -864,7 +909,7 @@ export default function POSPage() {
               <div>
                 <h2 className="text-base font-black uppercase text-slate-800 tracking-tight leading-none">Kalkulator Tunai</h2>
                 <p className="text-[9.5px] font-bold text-slate-400 mt-1 uppercase">
-                  A/N: {displayCustomer}
+                  {queueDisplay} • {displayCustomer}
                 </p>
               </div>
               <button type="button" onClick={() => setPaymentMode(null)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 cursor-pointer"><X className="w-4 h-4" /></button>
@@ -903,7 +948,14 @@ export default function POSPage() {
               </div>
             )}
 
-            <button type="button" onClick={processPayment} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3.5 rounded-xl text-xs font-black tracking-widest uppercase shadow-md active:scale-95 cursor-pointer">Selesaikan Transaksi</button>
+            <button 
+              type="button" 
+              onClick={processPayment} 
+              disabled={isSubmitting}
+              className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3.5 rounded-xl text-xs font-black tracking-widest uppercase shadow-md active:scale-95 cursor-pointer disabled:opacity-50"
+            >
+              {isSubmitting ? 'Menyimpan...' : 'Selesaikan Transaksi'}
+            </button>
           </div>
         </div>
       )}
@@ -921,7 +973,7 @@ export default function POSPage() {
             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total Tagihan</p>
             <p className="text-2xl font-black text-sky-600 mb-1">Rp {totalAkhir.toLocaleString('id-ID')}</p>
             <p className="text-[10px] font-bold text-slate-500 mb-3 uppercase">
-              A/N: {displayCustomer}
+              {queueDisplay} • {displayCustomer}
             </p>
 
             <div className="bg-white p-2 border-2 border-dashed border-slate-200 rounded-2xl mb-3 shadow-inner relative w-48 h-48 overflow-hidden">
@@ -932,12 +984,19 @@ export default function POSPage() {
               Pastikan pelanggan mentransfer sesuai nominal sebelum klik verifikasi lunas.
             </p>
 
-            <button type="button" onClick={processPayment} className="w-full bg-sky-500 hover:bg-sky-600 text-white py-3.5 rounded-xl text-xs font-black tracking-widest uppercase shadow-md active:scale-95 cursor-pointer">Verifikasi Lunas</button>
+            <button 
+              type="button" 
+              onClick={processPayment} 
+              disabled={isSubmitting}
+              className="w-full bg-sky-500 hover:bg-sky-600 text-white py-3.5 rounded-xl text-xs font-black tracking-widest uppercase shadow-md active:scale-95 cursor-pointer disabled:opacity-50"
+            >
+              {isSubmitting ? 'Memverifikasi...' : 'Verifikasi Lunas'}
+            </button>
           </div>
         </div>
       )}
 
-      {/* MODAL SUKSES */}
+      {/* MODAL SUKSES & CETAK STRUK */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-[220] flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
           <div className="bg-white rounded-[2rem] w-full max-w-sm overflow-hidden relative shadow-2xl p-5 sm:p-6 flex flex-col items-center text-center animate-in zoom-in-95 duration-200 my-auto">
@@ -946,8 +1005,8 @@ export default function POSPage() {
               <CheckCircle2 className="w-6 h-6" />
             </div>
             
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tighter leading-none mb-0.5">
-              #{String(queueNumber).padStart(2, '0')}
+            <span className="text-4xl sm:text-5xl font-black text-amber-500 tracking-tighter leading-none mb-1">
+              {queueDisplay}
             </span>
             <h2 className="text-sm sm:text-base font-black uppercase tracking-tight text-slate-800 mb-0.5" style={{ fontFamily: "'Montserrat', sans-serif" }}>Transaksi Berhasil!</h2>
             <p className="text-[10px] sm:text-[11px] font-bold text-slate-500 mb-3">A/N: <span className="text-slate-800 uppercase font-black">{displayCustomer}</span> ({orderType})</p>

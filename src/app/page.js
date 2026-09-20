@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import Hero from '@/components/Hero';
 import Menu from '@/components/Menu'; 
+import AboutUs from '@/components/AboutUs';
 import Footer from '@/components/Footer';
 import RacikModal from '@/components/RacikModal';
 import Cart from '@/components/Cart';
@@ -18,6 +19,7 @@ export default function Home() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [cartItems, setCartItems] = useState([]);
   const [editingIndex, setEditingIndex] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [isQrisOpen, setIsQrisOpen] = useState(false);
   const [pendingOrderInfo, setPendingOrderInfo] = useState(null);
@@ -93,60 +95,110 @@ export default function Home() {
     setCartItems([]);
   };
 
-  // Helper Pembuatan Order & Karcis Otomatis
-  const processCheckout = (orderMeta) => {
+  // CHECKOUT: Simpan langsung ke Supabase dengan status 'waiting_verification'
+  const processCheckout = async (orderMeta) => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
     try {
-      const history = JSON.parse(localStorage.getItem('siboy_order_history') || '[]');
-      const kitchen = JSON.parse(localStorage.getItem('siboy_kitchen_orders') || '[]');
+      // 1. Ambil nomor antrean harian dan Order ID berbasis tanggal
+      let qNo = '#01';
+      let orderId = `SB-${Date.now().toString().slice(-4)}`;
 
+      try {
+        const qRes = await fetch('/api/orders?action=next_queue');
+        const qJson = await qRes.json();
+        if (qJson.success) {
+          qNo = qJson.formattedQ;
+          orderId = qJson.generatedOrderId;
+        }
+      } catch (e) {}
+
+      // Format detail racikan item untuk database
+      const formattedDbItems = cartItems.map((item) => {
+        const topStr = Array.isArray(item.toppings) ? item.toppings.join(', ') : (item.toppings || 'Polos');
+        const sausStr = Array.isArray(item.saus) ? item.saus.join(' + ') : (item.saus || 'Tanpa Saus');
+        const vegStr = item.sayur || 'Pakai Sayur';
+        const racikanDesc = `(${topStr} | ${vegStr} | ${sausStr})`;
+
+        return {
+          name: `${item.name} ${racikanDesc}`,
+          quantity: item.quantity,
+          price: item.unitPrice,
+        };
+      });
+
+      const customerNotes = orderMeta.notes ? `Catatan: ${orderMeta.notes} | ` : '';
+      const finalNotes = `[${qNo}] ${customerNotes}Self-Order Web | Metode: ${orderMeta.paymentMethod}`;
+
+      // 2. Simpan ke Supabase via POST /api/orders
+      await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: orderId,
+          customerName: `${orderMeta.customerName} (Self-Order)`,
+          customerPhone: '-',
+          totalPrice: cartTotal,
+          status: 'waiting_verification',
+          notes: finalNotes,
+          items: formattedDbItems,
+        }),
+      });
+
+      // 3. Cadangan sinkronisasi lokal
       const now = new Date();
+      const formattedDate = now.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
       const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
-      
-      const qIndex = (history.length % 99) + 1;
-      const qNo = `#${qIndex.toString().padStart(2, '0')}`;
-      const orderId = `SB-${Date.now().toString().slice(-4)}`;
 
-      const formattedItems = cartItems.map(item => ({
-        name: item.name,
-        qty: item.quantity,
-        price: item.unitPrice,
-        toppings: item.toppings?.join(', ') || 'Polos',
-        veg: item.sayur || 'Pakai Sayur',
-        spicy: item.saus?.join(' + ') || 'Tanpa Saus'
-      }));
-
-      const newOrder = {
+      const localOrder = {
         id: orderId,
         qNo,
         name: orderMeta.customerName,
-        customerName: orderMeta.customerName,
+        customerName: `${orderMeta.customerName} (Self-Order)`,
+        date: formattedDate,
         time: timeStr,
-        timestamp: now.toISOString(),
+        timestamp: now.getTime(),
         rawTotal: cartTotal,
         total: `Rp ${cartTotal.toLocaleString('id-ID')}`,
         pay: orderMeta.paymentMethod,
-        status: 'waiting_verification', // Menunggu validasi kasir
-        notes: orderMeta.notes || '',
-        items: formattedItems
+        status: 'waiting_verification',
+        stat: 'Menunggu',
+        notes: finalNotes,
+        items: formattedDbItems.map(it => ({
+          name: it.name,
+          qty: it.quantity,
+          price: it.price,
+          toppings: it.name.includes('(') ? it.name.split('(')[1]?.replace(')', '') : 'Polos',
+          veg: '',
+          spicy: ''
+        }))
       };
 
-      // Simpan ke storage untuk kasir & dapur
-      localStorage.setItem('siboy_order_history', JSON.stringify([newOrder, ...history]));
-      localStorage.setItem('siboy_kitchen_orders', JSON.stringify([...kitchen, newOrder]));
-      window.dispatchEvent(new Event('storage'));
+      try {
+        const history = JSON.parse(localStorage.getItem('siboy_order_history') || '[]');
+        const kitchen = JSON.parse(localStorage.getItem('siboy_kitchen_orders') || '[]');
+        localStorage.setItem('siboy_order_history', JSON.stringify([localOrder, ...history]));
+        localStorage.setItem('siboy_kitchen_orders', JSON.stringify([...kitchen, localOrder]));
+        window.dispatchEvent(new Event('storage'));
+      } catch (err) {}
 
-      // Bersihkan keranjang dan buka halaman tiket
       handleClearCart();
       setIsCartOpen(false);
       setIsQrisOpen(false);
+      setIsSubmitting(false);
+
+      // 4. Arahkan pembeli ke karcis live tracker
       router.push(`/ticket?id=${orderId}`);
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      console.error('Checkout error:', error);
+      alert('Terjadi kesalahan saat memproses pesanan. Silakan coba lagi.');
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <main className="min-h-screen bg-[#070a11] text-slate-100 overflow-x-hidden relative">
+    <main className="min-h-screen bg-[#070a11] text-slate-100 overflow-x-hidden relative flex flex-col">
       <Navbar 
         cartCount={cartCount} 
         onOpenCart={() => setIsCartOpen(true)} 
@@ -160,17 +212,19 @@ export default function Home() {
         }} 
       />
 
-      <div className="relative z-10 w-full overflow-hidden">
-        <Menu 
-          isOpen={isOpen}
-          onSelectPackage={handleSelectPackage} 
-        />
-      </div>
+      {/* Menu Section */}
+      <Menu 
+        isOpen={isOpen}
+        onSelectPackage={handleSelectPackage} 
+      />
 
-      <div className="relative z-30 w-full bg-[#070a11] overflow-hidden">
-        <Footer />
-      </div>
+      {/* Section About Us */}
+      <AboutUs />
 
+      {/* Footer */}
+      <Footer />
+
+      {/* Modal Racik Menu */}
       {isModalOpen && selectedProduct && (
         <RacikModal 
           key={editingIndex !== null ? `edit-${editingIndex}` : `new-${selectedProduct.id || Date.now()}`}
@@ -185,7 +239,7 @@ export default function Home() {
         />
       )}
 
-      {/* MODAL QRIS */}
+      {/* Modal QRIS */}
       <Qris 
         isOpen={isQrisOpen}
         onClose={() => setIsQrisOpen(false)}
@@ -195,7 +249,7 @@ export default function Home() {
         }} 
       />
 
-      {/* KERANJANG */}
+      {/* Drawer Keranjang Pesanan */}
       <Cart 
         isOpen={isCartOpen}
         isOpenStore={isOpen}
