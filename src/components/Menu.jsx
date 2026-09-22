@@ -2,17 +2,17 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Flame, UtensilsCrossed } from 'lucide-react';
+import { Flame, UtensilsCrossed, Store } from 'lucide-react';
 
 const DEFAULT_PRICES = { kecil: 6000, besar: 12000, special: 17000 };
 
-export default function Menu({ onSelectPackage }) {
+export default function Menu({ onSelectPackage, isOpenStore = true }) {
   const [prices, setPrices] = useState(DEFAULT_PRICES);
 
   // Ambil data harga riil dari Supabase via API
   const fetchMenuFromDb = async () => {
     try {
-      const res = await fetch('/api/menu');
+      const res = await fetch('/api/menu', { cache: 'no-store' });
       const json = await res.json();
       if (json.success && Array.isArray(json.data) && json.data.length > 0) {
         const updated = { ...DEFAULT_PRICES };
@@ -24,28 +24,16 @@ export default function Menu({ onSelectPackage }) {
         setPrices(updated);
       }
     } catch (e) {
-      // Fallback ke localStorage jika koneksi terhambat
-      try {
-        const saved = localStorage.getItem('siboy_prices');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          setPrices({
-            kecil: parsed.kecil || DEFAULT_PRICES.kecil,
-            besar: parsed.besar || DEFAULT_PRICES.besar,
-            special: parsed.special || DEFAULT_PRICES.special,
-          });
-        }
-      } catch (err) {}
+      console.error('Gagal mengambil daftar harga menu:', e);
     }
   };
 
   useEffect(() => {
     fetchMenuFromDb();
 
-    // Listener jika admin mengubah harga di tab dashboard
-    const handleStorageChange = () => fetchMenuFromDb();
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    // Polling berkala tiap 10 detik agar harga selalu sinkron jika admin mengubahnya
+    const interval = setInterval(fetchMenuFromDb, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   const menuList = [
@@ -134,20 +122,6 @@ export default function Menu({ onSelectPackage }) {
         <path d="M15 3.5c0 1.5-1 2-1 3" />
       </svg>
 
-      <svg
-        className="absolute bottom-20 right-6 sm:right-20 w-28 sm:w-36 h-28 sm:h-36 text-black/[0.12] pointer-events-none -rotate-12"
-        viewBox="0 0 24 24"
-        fill="currentColor"
-      >
-        <rect x="2" y="5" width="20" height="14" rx="3" fillOpacity="0.2" />
-        <circle cx="6" cy="9" r="2" />
-        <circle cx="12" cy="9" r="2" />
-        <circle cx="18" cy="9" r="2" />
-        <circle cx="6" cy="15" r="2" />
-        <circle cx="12" cy="15" r="2" />
-        <circle cx="18" cy="15" r="2" />
-      </svg>
-
       {/* ================= 4. KONTEN UTAMA ================= */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 w-full relative z-10">
         {/* Header Section */}
@@ -180,6 +154,8 @@ export default function Menu({ onSelectPackage }) {
           >
             Dibuat fresh langsung dari wajan panggang setiap hari
           </p>
+
+          
         </div>
 
         {/* Grid Kartu Menu */}
@@ -187,8 +163,16 @@ export default function Menu({ onSelectPackage }) {
           {menuList.map((item) => (
             <div
               key={item.id}
-              onClick={() => onSelectPackage && onSelectPackage(item)}
-              className="snap-center shrink-0 w-[78vw] sm:w-full max-w-[280px] sm:max-w-none rounded-[1.25rem] bg-white transition-all duration-300 flex flex-col overflow-hidden relative cursor-pointer group shadow-xl hover:shadow-2xl hover:-translate-y-1.5 border-2 border-white hover:border-amber-400"
+              onClick={() => {
+                if (isOpenStore && onSelectPackage) {
+                  onSelectPackage(item);
+                }
+              }}
+              className={`snap-center shrink-0 w-[78vw] sm:w-full max-w-[280px] sm:max-w-none rounded-[1.25rem] bg-white transition-all duration-300 flex flex-col overflow-hidden relative border-2 ${
+                isOpenStore
+                  ? 'cursor-pointer group shadow-xl hover:shadow-2xl hover:-translate-y-1.5 border-white hover:border-amber-400'
+                  : 'cursor-not-allowed opacity-75 border-slate-200 grayscale-[30%]'
+              }`}
             >
               <div className="relative w-full aspect-[4/3] bg-slate-100 overflow-hidden">
                 <Image
@@ -196,7 +180,9 @@ export default function Menu({ onSelectPackage }) {
                   alt={item.name}
                   fill
                   sizes="(max-width: 640px) 78vw, 300px"
-                  className="object-cover object-center transition-transform duration-500 group-hover:scale-105"
+                  className={`object-cover object-center transition-transform duration-500 ${
+                    isOpenStore ? 'group-hover:scale-105' : ''
+                  }`}
                 />
 
                 {item.badge && (
@@ -206,6 +192,14 @@ export default function Menu({ onSelectPackage }) {
                   >
                     <Flame className="w-3.5 h-3.5 fill-slate-950 text-slate-950" />
                     <span>{item.badge}</span>
+                  </div>
+                )}
+
+                {!isOpenStore && (
+                  <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px] flex items-center justify-center z-10">
+                    <span className="bg-slate-900/90 text-white font-black text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full border border-white/20">
+                      Tutup
+                    </span>
                   </div>
                 )}
               </div>
@@ -226,13 +220,18 @@ export default function Menu({ onSelectPackage }) {
                   </span>
                 </div>
 
-                <div className="mt-auto pt-4 border-t border-slate-100">
+                <div className="mt-auto pt-4 border-t border-slate-100 flex items-center justify-between">
                   <span
                     className="text-2xl font-black text-red-600 tracking-tight"
                     style={{ fontFamily: "'Montserrat', sans-serif" }}
                   >
                     {item.price}
                   </span>
+                  {isOpenStore && (
+                    <span className="text-[10px] font-black uppercase text-amber-600 bg-amber-50 px-2 py-1 rounded-md">
+                      Racik
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

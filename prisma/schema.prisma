@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DIRECT_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // 1. Tabel Menu & Harga
@@ -49,4 +50,22 @@ model Admin {
   username  String   @unique
   password  String
   createdAt DateTime @default(now())
+}
+
+// 5. Status Buka / Tutup Toko (Real-Time)
+model StoreSetting {
+  id        String   @id @default("default")
+  isOpen    Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+}
+
+// 6. Ketersediaan Topping (Real-Time)
+model Topping {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  status    String   @default("Aman")
+  color     String   @default("#10b981")
+  pct       Int      @default(100)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

@@ -15,32 +15,36 @@ import {
 export default function Hero({ onOrderClick }) {
   const [isOpen, setIsOpen] = useState(true);
 
-  // SINKRONISASI MULTI-TAB & REAL-TIME DARI DASHBOARD
+  // SINKRONISASI REAL-TIME DARI SUPABASE VIA API ROUTE
   useEffect(() => {
-    const checkStoreStatus = () => {
+    let isMounted = true;
+
+    const fetchStatusFromDb = async () => {
       try {
-        const saved = localStorage.getItem('siboy_store_status');
-        if (saved !== null) {
-          setIsOpen(JSON.parse(saved));
+        const res = await fetch('/api/store-status', { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted && typeof data.isOpen === 'boolean') {
+            setIsOpen(data.isOpen);
+          }
         }
-      } catch (e) {}
+      } catch (err) {
+        console.error('Gagal memuat status buka/tutup toko dari database:', err);
+      }
     };
 
-    // 1. Cek saat pertama kali dibuka
-    checkStoreStatus();
+    // 1. Cek status pertama kali saat landing page dibuka
+    fetchStatusFromDb();
 
-    // 2. Tangkap event storage saat tab Dashboard digeser
-    window.addEventListener('storage', checkStoreStatus);
+    // 2. Cek instan saat pengunjung kembali membuka / fokus ke tab browser
+    window.addEventListener('focus', fetchStatusFromDb);
 
-    // 3. Tangkap saat user balik fokus ke tab Landing Page
-    window.addEventListener('focus', checkStoreStatus);
-
-    // 4. Polling ringan (tiap 500ms) agar dijamin 100% instan tanpa delay
-    const interval = setInterval(checkStoreStatus, 500);
+    // 3. Polling berkala tiap 4 detik agar sinkron otomatis saat admin menutup gerai
+    const interval = setInterval(fetchStatusFromDb, 4000);
 
     return () => {
-      window.removeEventListener('storage', checkStoreStatus);
-      window.removeEventListener('focus', checkStoreStatus);
+      isMounted = false;
+      window.removeEventListener('focus', fetchStatusFromDb);
       clearInterval(interval);
     };
   }, []);
@@ -97,7 +101,7 @@ export default function Hero({ onOrderClick }) {
               </h1>
             </div>
 
-            {/* TOMBOL PESAN: BERUBAH ABU-ABU JIKA TOKO TUTUP */}
+            {/* TOMBOL PESAN: OTOMATIS TERKUNCI JIKA TOKO DITUTUP ADMIN */}
             <div className="pt-8 sm:pt-10 lg:pt-12 w-full animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
               {isOpen ? (
                 <button
@@ -112,15 +116,15 @@ export default function Hero({ onOrderClick }) {
                 <button
                   type="button"
                   disabled
-                  className="group relative w-full sm:w-max px-8 py-4 bg-slate-200 text-slate-400 border border-slate-300 font-black text-xs sm:text-sm uppercase tracking-widest rounded-full flex items-center justify-center gap-3 cursor-not-allowed shadow-none"
+                  className="group relative w-full sm:w-max px-8 py-4 bg-slate-200 text-slate-400 border border-slate-300 font-black text-xs sm:text-sm uppercase tracking-widest rounded-full flex items-center justify-center gap-3 cursor-not-allowed shadow-none select-none"
                 >
                   <Store className="w-5 h-5 text-slate-400 shrink-0" />
-                  <span>Toko Sedang Tutup</span>
+                  <span>Gerai Sedang Tutup</span>
                 </button>
               )}
             </div>
 
-            {/* 4 KARTU KEUNGGULAN TERBARU */}
+            {/* 4 KARTU KEUNGGULAN */}
             <div className="mt-10 lg:mt-12 w-full grid grid-cols-2 gap-3 sm:gap-4 max-w-xl mx-auto lg:mx-0">
               
               <div className="group bg-white p-3.5 sm:p-4 rounded-2xl border-2 border-slate-100 shadow-sm hover:shadow-lg hover:shadow-red-500/20 hover:border-red-400 flex items-center gap-3 sm:gap-4 transition-all duration-200 ease-in-out cursor-default hover:-translate-y-1 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-300 fill-mode-both">
@@ -187,9 +191,7 @@ export default function Hero({ onOrderClick }) {
                 />
               </div>
 
-              {/* ===================================================================== */}
-              {/* BAGIAN YANG DILINGKARI MERAH: STATUS OPERASIONAL DINAMIS DARI DASHBOARD */}
-              {/* ===================================================================== */}
+              {/* INDIKATOR STATUS OPERASIONAL: LIVE DARI DATABASE SUPABASE */}
               <div className="absolute -top-3 -left-3 sm:-top-4 sm:-left-6 z-20 animate-in fade-in slide-in-from-top-4 duration-700 delay-700 fill-mode-both">
                 {isOpen ? (
                   <div className="bg-white/95 backdrop-blur-sm border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.08)] rounded-full px-4 py-2 sm:py-2.5 flex items-center gap-2.5 transition-all">
@@ -202,11 +204,11 @@ export default function Hero({ onOrderClick }) {
                     </span>
                   </div>
                 ) : (
-                  <div className="bg-slate-900/90 text-white backdrop-blur-sm border border-slate-700 shadow-[0_8px_30px_rgb(0,0,0,0.2)] rounded-full px-4 py-2 sm:py-2.5 flex items-center gap-2.5 transition-all">
+                  <div className="bg-slate-900/95 text-white backdrop-blur-sm border border-slate-700 shadow-[0_8px_30px_rgb(0,0,0,0.2)] rounded-full px-4 py-2 sm:py-2.5 flex items-center gap-2.5 transition-all">
                     <span className="relative flex h-2.5 w-2.5">
                       <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
                     </span>
-                    <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-white leading-none mt-0.5">
+                    <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-rose-400 leading-none mt-0.5">
                       Tutup
                     </span>
                   </div>

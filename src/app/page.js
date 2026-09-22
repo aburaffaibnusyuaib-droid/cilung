@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import Hero from '@/components/Hero';
@@ -24,25 +24,41 @@ export default function Home() {
   const [isQrisOpen, setIsQrisOpen] = useState(false);
   const [pendingOrderInfo, setPendingOrderInfo] = useState(null);
 
-  useEffect(() => {
-    const checkStoreStatus = () => {
+  // SINKRONISASI STATUS GERAI DARI SUPABASE (REAL-TIME POLLING)
+  const fetchStoreStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/store-status', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (typeof data?.isOpen === 'boolean') {
+          setIsOpen(data.isOpen);
+          try {
+            localStorage.setItem('siboy_store_status', JSON.stringify(data.isOpen));
+          } catch (e) {}
+        }
+      }
+    } catch (err) {
+      // Fallback lokal jika ada gangguan koneksi sesaat
       try {
         const saved = localStorage.getItem('siboy_store_status');
         if (saved !== null) setIsOpen(JSON.parse(saved));
       } catch (e) {}
-    };
+    }
+  }, []);
 
-    checkStoreStatus();
-    window.addEventListener('storage', checkStoreStatus);
-    window.addEventListener('focus', checkStoreStatus);
-    const interval = setInterval(checkStoreStatus, 500);
+  useEffect(() => {
+    // Ambil status pertama kali saat halaman dibuka
+    fetchStoreStatus();
+
+    // Cek berkala tiap 10 detik dan saat tab browser aktif kembali
+    const interval = setInterval(fetchStoreStatus, 10000);
+    window.addEventListener('focus', fetchStoreStatus);
 
     return () => {
-      window.removeEventListener('storage', checkStoreStatus);
-      window.removeEventListener('focus', checkStoreStatus);
       clearInterval(interval);
+      window.removeEventListener('focus', fetchStoreStatus);
     };
-  }, []);
+  }, [fetchStoreStatus]);
 
   const cartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
   const cartTotal = cartItems.reduce((acc, item) => acc + (item.totalPrice || 0), 0);

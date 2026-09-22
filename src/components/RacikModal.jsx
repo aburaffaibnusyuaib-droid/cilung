@@ -24,7 +24,7 @@ const BeefSteakIcon = ({ className = 'w-4 h-4' }) => (
 );
 
 const CrabIcon = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <ellipse cx="12" cy="14" rx="5" ry="4" />
     <path d="M7 11c-2-3-4-2-4 1 0 2 2 3 4 2" />
     <path d="M17 11c2-3 4-2 4 1 0 2-2 3-4 2" />
@@ -46,7 +46,7 @@ const CheeseWedgeIcon = ({ className = 'w-4.5 h-4.5' }) => (
 );
 
 const KatsuobushiIcon = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M5 8c3-3 7 0 9-1s4 4 1 5-6 1-8 3-4-4-2-7z" />
     <path d="M11 16c2-2 5 0 7-1" />
   </svg>
@@ -68,11 +68,11 @@ const MayoSwirlIcon = ({ className = 'w-4 h-4' }) => (
 );
 
 const DEFAULT_TOPPINGS = [
-  { id: 1, name: 'Katsuobushi', status: 'Aman' },
-  { id: 2, name: 'Keju Mozza', status: 'Aman' },
-  { id: 3, name: 'Sosis Ayam', status: 'Menipis' },
-  { id: 4, name: 'Crabstick', status: 'Aman' },
-  { id: 5, name: 'Kornet Gurih', status: 'Habis' }
+  { id: '1', name: 'Katsuobushi', status: 'Aman' },
+  { id: '2', name: 'Keju Mozza', status: 'Aman' },
+  { id: '3', name: 'Sosis Ayam', status: 'Menipis' },
+  { id: '4', name: 'Crabstick', status: 'Aman' },
+  { id: '5', name: 'Kornet Gurih', status: 'Habis' }
 ];
 
 export default function MenuModal({ product, onClose, onAddToCart, isOpenStore = true }) {
@@ -87,23 +87,37 @@ export default function MenuModal({ product, onClose, onAddToCart, isOpenStore =
   const [catatan, setCatatan] = useState(product.catatan || '');
   const [toppingsStock, setToppingsStock] = useState(DEFAULT_TOPPINGS);
 
-  // SINKRONISASI STOK TOPPING DARI DASHBOARD ADMIN
+  // 1. SINKRONISASI STOK TOPPING LIVE DARI SUPABASE
   useEffect(() => {
-    const syncStock = () => {
+    let isMounted = true;
+
+    const fetchToppings = async () => {
       try {
-        const saved = localStorage.getItem('siboy_toppings');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setToppingsStock(parsed);
+        const res = await fetch('/api/toppings', { cache: 'no-store' });
+        if (res.ok) {
+          const json = await res.json();
+          if (isMounted && json.success && Array.isArray(json.data) && json.data.length > 0) {
+            setToppingsStock(json.data);
+
+            // Bersihkan pilihan jika ada topping yang tiba-tiba berstatus 'Habis'
+            const outOfStockNames = json.data
+              .filter((t) => t.status === 'Habis')
+              .map((t) => t.name);
+
+            setSelectedToppings((prev) => 
+              prev.filter((topName) => !outOfStockNames.includes(topName))
+            );
           }
         }
-      } catch (e) {}
+      } catch (e) {
+        console.warn('Gagal memuat topping real-time, menggunakan data fallback.');
+      }
     };
 
-    syncStock();
-    window.addEventListener('storage', syncStock);
-    return () => window.removeEventListener('storage', syncStock);
+    fetchToppings();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -123,13 +137,14 @@ export default function MenuModal({ product, onClose, onAddToCart, isOpenStore =
     if (e.target === e.currentTarget) onClose();
   };
 
-  const getToppingIcon = (name) => {
+  // Helper Ikon Fleksibel untuk topping lama maupun topping baru
+  const getToppingIcon = (name = '') => {
     const n = name.toLowerCase();
     if (n.includes('sosis')) return <SausageHorizontalIcon className="w-4 h-4 text-orange-500" />;
-    if (n.includes('kornet') || n.includes('daging')) return <BeefSteakIcon className="w-4 h-4 text-rose-700" />;
-    if (n.includes('crab')) return <CrabIcon className="w-4 h-4 text-red-500" />;
-    if (n.includes('keju') || n.includes('mozza')) return <CheeseWedgeIcon className="w-4.5 h-4.5 text-amber-500" />;
-    if (n.includes('katsuobushi') || n.includes('cakalang')) return <KatsuobushiIcon className="w-4 h-4 text-yellow-700" />;
+    if (n.includes('kornet') || n.includes('daging') || n.includes('beef')) return <BeefSteakIcon className="w-4 h-4 text-rose-700" />;
+    if (n.includes('crab') || n.includes('kepiting')) return <CrabIcon className="w-4 h-4 text-red-500" />;
+    if (n.includes('keju') || n.includes('mozza') || n.includes('cheese')) return <CheeseWedgeIcon className="w-4.5 h-4.5 text-amber-500" />;
+    if (n.includes('katsuobushi') || n.includes('cakalang') || n.includes('ikan')) return <KatsuobushiIcon className="w-4 h-4 text-yellow-700" />;
     return <Flame className="w-4 h-4 text-amber-500" />;
   };
 
@@ -164,7 +179,8 @@ export default function MenuModal({ product, onClose, onAddToCart, isOpenStore =
     },
   ];
 
-  const handleToggleTopping = (name) => {
+  const handleToggleTopping = (name, isHabis) => {
+    if (!isOpenStore || isHabis) return;
     if (name === 'polos' || name === 'Tanpa Topping') {
       setSelectedToppings(['Tanpa Topping']);
       return;
@@ -179,6 +195,7 @@ export default function MenuModal({ product, onClose, onAddToCart, isOpenStore =
   };
 
   const handleToggleSaus = (id) => {
+    if (!isOpenStore) return;
     if (id === 'tanpasaus') {
       setSelectedSaus(['tanpasaus']);
       return;
@@ -249,18 +266,18 @@ export default function MenuModal({ product, onClose, onAddToCart, isOpenStore =
           </button>
         </div>
 
-        {/* Banner Jika Toko Sedang Tutup */}
+        {/* Banner Peringatan Jika Toko Sedang Tutup */}
         {!isOpenStore && (
-          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center gap-2 text-amber-800 text-[11px] font-bold">
-            <Store className="w-4 h-4 shrink-0 text-amber-600" />
-            <span>Toko sedang tutup. Kamu tetap bisa melihat varian racikan, tetapi pesanan tidak dapat ditambahkan.</span>
+          <div className="bg-rose-50 border-b border-rose-200 px-4 py-2.5 flex items-center gap-2 text-rose-800 text-[11px] font-bold">
+            <Store className="w-4 h-4 shrink-0 text-rose-600" />
+            <span>Gerai sedang tutup. Menu ini hanya dalam mode pratinjau dan tidak dapat dipesan.</span>
           </div>
         )}
 
         {/* Body Content */}
         <div className="p-4 sm:p-6 overflow-y-auto space-y-7 scrollbar-hide bg-[#fcfcfc]">
           
-          {/* Section 1: Topping Dinamis Tersinkron ke Dashboard */}
+          {/* Section 1: Pilihan Topping */}
           <div className="space-y-3.5">
             <div className="flex items-center justify-between px-1">
               <label className="text-sm font-black uppercase text-slate-900 tracking-wider" style={{ fontFamily: "'Montserrat', sans-serif" }}>
@@ -276,12 +293,12 @@ export default function MenuModal({ product, onClose, onAddToCart, isOpenStore =
 
                 return (
                   <button
-                    key={topping.id}
+                    key={topping.id || topping.name}
                     disabled={isHabis || !isOpenStore}
-                    onClick={() => handleToggleTopping(topping.name)}
+                    onClick={() => handleToggleTopping(topping.name, isHabis)}
                     type="button"
                     className={`group py-2.5 px-3.5 rounded-full border transition-all duration-200 flex items-center justify-between text-left active:scale-[0.98] ${
-                      isHabis 
+                      isHabis || !isOpenStore
                         ? 'bg-slate-100 border-slate-200 text-slate-400 opacity-50 cursor-not-allowed'
                         : isSelected
                           ? 'border-amber-500 text-amber-900 bg-amber-50 shadow-sm cursor-pointer'
@@ -317,11 +334,13 @@ export default function MenuModal({ product, onClose, onAddToCart, isOpenStore =
               <button
                 type="button"
                 disabled={!isOpenStore}
-                onClick={() => handleToggleTopping('Tanpa Topping')}
-                className={`group py-2.5 px-3.5 rounded-full border transition-all duration-200 flex items-center justify-between text-left active:scale-[0.98] cursor-pointer ${
-                  selectedToppings.includes('Tanpa Topping') || selectedToppings.includes('polos')
-                    ? 'border-slate-400 text-slate-700 bg-slate-100 shadow-sm'
-                    : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 shadow-sm'
+                onClick={() => handleToggleTopping('Tanpa Topping', false)}
+                className={`group py-2.5 px-3.5 rounded-full border transition-all duration-200 flex items-center justify-between text-left active:scale-[0.98] ${
+                  !isOpenStore
+                    ? 'bg-slate-100 border-slate-200 text-slate-400 opacity-50 cursor-not-allowed'
+                    : selectedToppings.includes('Tanpa Topping') || selectedToppings.includes('polos')
+                      ? 'border-slate-400 text-slate-700 bg-slate-100 shadow-sm cursor-pointer'
+                      : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 shadow-sm cursor-pointer'
                 }`}
               >
                 <div className="flex items-center gap-2.5">
@@ -350,11 +369,14 @@ export default function MenuModal({ product, onClose, onAddToCart, isOpenStore =
             <div className="grid grid-cols-2 gap-2.5">
               <button
                 type="button"
+                disabled={!isOpenStore}
                 onClick={() => setPakaiSayur(true)}
-                className={`py-2.5 px-3.5 rounded-full border transition-all duration-200 flex items-center justify-between text-left active:scale-[0.98] cursor-pointer ${
-                  pakaiSayur 
-                    ? 'border-emerald-500 text-emerald-700 bg-emerald-50 shadow-sm' 
-                    : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                className={`py-2.5 px-3.5 rounded-full border transition-all duration-200 flex items-center justify-between text-left active:scale-[0.98] ${
+                  !isOpenStore
+                    ? 'bg-slate-100 border-slate-200 text-slate-400 opacity-50 cursor-not-allowed'
+                    : pakaiSayur 
+                      ? 'border-emerald-500 text-emerald-700 bg-emerald-50 shadow-sm cursor-pointer' 
+                      : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 cursor-pointer'
                 }`}
               >
                 <div className="flex items-center gap-2.5">
@@ -372,11 +394,14 @@ export default function MenuModal({ product, onClose, onAddToCart, isOpenStore =
               
               <button
                 type="button"
+                disabled={!isOpenStore}
                 onClick={() => setPakaiSayur(false)}
-                className={`py-2.5 px-3.5 rounded-full border transition-all duration-200 flex items-center justify-between text-left active:scale-[0.98] cursor-pointer ${
-                  !pakaiSayur 
-                    ? 'border-slate-400 text-slate-600 bg-slate-50 shadow-sm' 
-                    : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                className={`py-2.5 px-3.5 rounded-full border transition-all duration-200 flex items-center justify-between text-left active:scale-[0.98] ${
+                  !isOpenStore
+                    ? 'bg-slate-100 border-slate-200 text-slate-400 opacity-50 cursor-not-allowed'
+                    : !pakaiSayur 
+                      ? 'border-slate-400 text-slate-600 bg-slate-50 shadow-sm cursor-pointer' 
+                      : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 cursor-pointer'
                 }`}
               >
                 <div className="flex items-center gap-2.5">
@@ -409,12 +434,15 @@ export default function MenuModal({ product, onClose, onAddToCart, isOpenStore =
                 return (
                   <button
                     key={saus.id}
+                    disabled={!isOpenStore}
                     onClick={() => handleToggleSaus(saus.id)}
                     type="button"
-                    className={`group py-2.5 px-3.5 rounded-full border transition-all duration-200 flex items-center justify-between text-left active:scale-[0.98] cursor-pointer ${
-                      isSelected
-                        ? `${saus.activeStyle} shadow-sm`
-                        : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 shadow-sm shadow-slate-100/50'
+                    className={`group py-2.5 px-3.5 rounded-full border transition-all duration-200 flex items-center justify-between text-left active:scale-[0.98] ${
+                      !isOpenStore
+                        ? 'bg-slate-100 border-slate-200 text-slate-400 opacity-50 cursor-not-allowed'
+                        : isSelected
+                          ? `${saus.activeStyle} shadow-sm cursor-pointer`
+                          : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 shadow-sm shadow-slate-100/50 cursor-pointer'
                     }`}
                   >
                     <div className="flex items-center gap-2.5">
@@ -440,11 +468,14 @@ export default function MenuModal({ product, onClose, onAddToCart, isOpenStore =
           <div className="space-y-2 pt-2">
             <label className="text-xs font-bold text-slate-700 block px-1 font-serif">Catatan Khusus (Opsional):</label>
             <textarea
+              disabled={!isOpenStore}
               value={catatan}
               onChange={(e) => setCatatan(e.target.value)}
               placeholder="Contoh: Sausnya dipisah ya bang..."
               rows={2}
-              className="w-full bg-white border border-slate-200 rounded-3xl p-4 text-xs font-serif text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/10 transition-all resize-none shadow-sm"
+              className={`w-full bg-white border border-slate-200 rounded-3xl p-4 text-xs font-serif text-slate-800 placeholder:text-slate-400 transition-all resize-none shadow-sm ${
+                !isOpenStore ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/10'
+              }`}
             />
           </div>
         </div>
@@ -491,7 +522,7 @@ export default function MenuModal({ product, onClose, onAddToCart, isOpenStore =
               style={{ fontFamily: "'Montserrat', sans-serif" }}
             >
               <Store className="w-4 h-4 text-slate-400" />
-              <span>TOKO SEDANG TUTUP (VIEW ONLY)</span>
+              <span>GERAI SEDANG TUTUP</span>
             </button>
           )}
         </div>

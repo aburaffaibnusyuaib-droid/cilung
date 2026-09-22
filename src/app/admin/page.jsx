@@ -10,12 +10,12 @@ import {
 import AdminSidebar from '@/components/AdminSidebar';
 
 const INITIAL_PRICES = { kecil: 6000, besar: 12000, special: 17000 };
-const INITIAL_TOPPINGS = [
-  { id: 1, name: 'Katsuobushi', status: 'Aman', color: '#10b981', pct: 100 },
-  { id: 2, name: 'Keju Mozza', status: 'Aman', color: '#10b981', pct: 100 },
-  { id: 3, name: 'Sosis Ayam', status: 'Menipis', color: '#f59e0b', pct: 40 },
-  { id: 4, name: 'Crabstick', status: 'Aman', color: '#10b981', pct: 100 },
-  { id: 5, name: 'Kornet Gurih', status: 'Habis', color: '#ef4444', pct: 0 }
+const DEFAULT_FALLBACK_TOPPINGS = [
+  { id: '1', name: 'Katsuobushi', status: 'Aman', color: '#10b981', pct: 100 },
+  { id: '2', name: 'Keju Mozza', status: 'Aman', color: '#10b981', pct: 100 },
+  { id: '3', name: 'Sosis Ayam', status: 'Menipis', color: '#f59e0b', pct: 40 },
+  { id: '4', name: 'Crabstick', status: 'Aman', color: '#10b981', pct: 100 },
+  { id: '5', name: 'Kornet Gurih', status: 'Habis', color: '#ef4444', pct: 0 }
 ];
 
 export default function AdminDashboard() {
@@ -24,7 +24,7 @@ export default function AdminDashboard() {
   const [isOpen, setIsOpen] = useState(true);
   
   // STATE FILTERING TANGGAL & KALENDER
-  const [period, setPeriod] = useState('today'); // today, week, month, date
+  const [period, setPeriod] = useState('today');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
 
@@ -37,20 +37,20 @@ export default function AdminDashboard() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // STATE DATA STORAGE & SUPABASE
+  // STATE DATA HARGA, TOPPING & STATISTIK
   const [prices, setPrices] = useState(INITIAL_PRICES);
-  const [toppings, setToppings] = useState(INITIAL_TOPPINGS);
+  const [toppings, setToppings] = useState(DEFAULT_FALLBACK_TOPPINGS);
   const [newToppingName, setNewToppingName] = useState('');
   const [toppingError, setToppingError] = useState('');
   
   const [rawHistory, setRawHistory] = useState([]);
   const [kitchenCount, setKitchenCount] = useState(0);
 
-  // Ambil Data Terkini dari Supabase via API
+  // Ambil Data Terkini dari Database Supabase via API
   const fetchDbData = async () => {
     try {
-      // 1. Ambil Semua Transaksi untuk Metrik Omzet & Grafik
-      const resOrders = await fetch('/api/orders');
+      // 1. Ambil Transaksi Masuk
+      const resOrders = await fetch('/api/orders', { cache: 'no-store' });
       const jsonOrders = await resOrders.json();
       if (jsonOrders.success && Array.isArray(jsonOrders.data)) {
         const mapped = jsonOrders.data.map(o => {
@@ -73,7 +73,6 @@ export default function AdminDashboard() {
         });
         setRawHistory(mapped);
 
-        // Hitung antrean aktif di dapur (pending & cooking)
         const activeKitchen = mapped.filter(o => {
           const s = (o.status || '').toLowerCase();
           return s === 'pending' || s === 'cooking' || s === 'waiting_verification';
@@ -81,8 +80,8 @@ export default function AdminDashboard() {
         setKitchenCount(activeKitchen);
       }
 
-      // 2. Ambil Daftar Menu & Harga dari Database Supabase
-      const resMenu = await fetch('/api/menu');
+      // 2. Ambil Daftar Menu & Harga Terkini
+      const resMenu = await fetch('/api/menu', { cache: 'no-store' });
       const jsonMenu = await resMenu.json();
       if (jsonMenu.success && Array.isArray(jsonMenu.data) && jsonMenu.data.length > 0) {
         const newPrices = { ...INITIAL_PRICES };
@@ -93,12 +92,26 @@ export default function AdminDashboard() {
         });
         setPrices(newPrices);
       }
+
+      // 3. Ambil Status Buka / Tutup Toko dari Supabase
+      const resStatus = await fetch('/api/store-status', { cache: 'no-store' });
+      const jsonStatus = await resStatus.json();
+      if (typeof jsonStatus.isOpen === 'boolean') {
+        setIsOpen(jsonStatus.isOpen);
+      }
+
+      // 4. Ambil Seluruh Daftar Topping Real-Time dari Supabase
+      const resToppings = await fetch('/api/toppings', { cache: 'no-store' });
+      const jsonToppings = await resToppings.json();
+      if (jsonToppings.success && Array.isArray(jsonToppings.data) && jsonToppings.data.length > 0) {
+        setToppings(jsonToppings.data);
+      }
+
     } catch (e) {
-      console.error('Error saat sinkronisasi data dashboard:', e);
+      console.error('Error sinkronisasi dashboard:', e);
     }
   };
 
-  // 1. Inisialisasi & Sinkronisasi Storage & Supabase
   useEffect(() => {
     setIsMounted(true);
     const auth = localStorage.getItem('admin_auth');
@@ -106,21 +119,15 @@ export default function AdminDashboard() {
 
     const syncLocal = () => {
       try {
-        const savedStatus = localStorage.getItem('siboy_store_status');
-        if (savedStatus !== null) setIsOpen(JSON.parse(savedStatus));
-
         const savedDemo = localStorage.getItem('siboy_demo_mode');
         if (savedDemo !== null) setIsDemoMode(JSON.parse(savedDemo));
-
-        const savedToppings = localStorage.getItem('siboy_toppings');
-        if (savedToppings) setToppings(JSON.parse(savedToppings));
       } catch (e) {}
     };
 
     syncLocal();
     fetchDbData();
 
-    // Polling data dashboard tiap 5 detik agar metrik selalu sinkron dengan kasir
+    // Polling tiap 5 detik agar status dan angka omzet selalu live
     const interval = setInterval(fetchDbData, 5000);
     window.addEventListener('storage', syncLocal);
 
@@ -130,11 +137,26 @@ export default function AdminDashboard() {
     };
   }, [router]);
 
-  const toggleStoreStatus = () => {
+  // TOGGLE STATUS BUKA / TUTUP TOKO GLOBAL KE SUPABASE
+  const toggleStoreStatus = async () => {
     const nextStatus = !isOpen;
     setIsOpen(nextStatus);
-    localStorage.setItem('siboy_store_status', JSON.stringify(nextStatus));
-    window.dispatchEvent(new Event('storage'));
+
+    try {
+      const res = await fetch('/api/store-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isOpen: nextStatus }),
+      });
+      const data = await res.json();
+      if (!res.ok || typeof data.isOpen !== 'boolean') {
+        throw new Error('Gagal update status di server');
+      }
+    } catch (err) {
+      console.error('Gagal memperbarui status toko ke Supabase:', err);
+      setIsOpen(!nextStatus);
+      alert('Gagal mengubah status toko ke database.');
+    }
   };
 
   const toggleDemoMode = () => {
@@ -155,7 +177,7 @@ export default function AdminDashboard() {
     return 'Hari Ini';
   };
 
-  // 2. Kalkulasi Data Transaksi Riil dari Supabase
+  // Kalkulasi Transaksi
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
@@ -191,7 +213,6 @@ export default function AdminDashboard() {
       liveRev += Number(rawVal) || 0;
 
       let qtyInOrder = 0;
-
       if (ord.items && Array.isArray(ord.items) && ord.items.length > 0) {
         ord.items.forEach(it => {
           const q = Number(it.qty || it.quantity || 1);
@@ -223,7 +244,6 @@ export default function AdminDashboard() {
     }
   });
 
-  // 3. Pengali Mode Demo
   let mult = 1;
   if (period === 'week') mult = 7;
   if (period === 'month') mult = 30;
@@ -238,7 +258,7 @@ export default function AdminDashboard() {
   const displayAvg = `Rp ${finalAvg.toLocaleString('id-ID')}`;
   const activeAntrean = isDemoMode && period !== 'date' ? Math.max(4, kitchenCount) : kitchenCount;
 
-  // BUILDER GRAFIK: Jam Ramai
+  // Builder Grafik Jam Ramai
   const baseWave = [4, 12, 18, 15, 9, 6, 2].map(v => Math.round(v * mult));
   const waveData = baseWave.map((bVal, i) => {
     const h = 16 + i;
@@ -252,7 +272,7 @@ export default function AdminDashboard() {
   const areaPathData = `${pathData} L 445 90 L 25 90 Z`;
   const topHour = waveData.reduce((max, obj) => obj.val > max.val ? obj : max, waveData[0]);
 
-  // BUILDER GRAFIK: Siklus Harian
+  // Siklus Harian
   const baseDays = [20, 24, 22, 29, 38, 44, 32].map(v => Math.round(v * (mult / 7 || 1)));
   const dayNames = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
   
@@ -267,7 +287,7 @@ export default function AdminDashboard() {
     d.isPeak = d.val === maxDayVal && d.val > 0;
   });
 
-  // BUILDER GRAFIK: Tipe Kardus
+  // Tipe Kardus
   const basePortions = { besar: Math.round(15 * mult), kecil: Math.round(9 * mult), special: Math.round(4 * mult) };
   const portionData = [
     { label: 'Porsi Besar', pcs: (isDemoMode ? basePortions.besar : 0) + pType.besar, color: '#ef4444' },
@@ -285,14 +305,12 @@ export default function AdminDashboard() {
     cumulativeOffset -= pct;
   });
 
-  // UPDATE HARGA KE SUPABASE & LOCALSTORAGE
+  // UPDATE HARGA MENU KE SUPABASE
   const handlePriceChange = async (key, value) => {
     const val = parseInt(value, 10) || 0;
     const updated = { ...prices, [key]: val };
     setPrices(updated);
-    localStorage.setItem('siboy_prices', JSON.stringify(updated));
 
-    // Kirim update harga ke Supabase API
     try {
       await fetch('/api/menu', {
         method: 'PUT',
@@ -302,41 +320,92 @@ export default function AdminDashboard() {
     } catch (err) {
       console.error('Gagal update harga ke Supabase:', err);
     }
-
-    window.dispatchEvent(new Event('storage'));
   };
 
-  // UPDATE STATUS TOPPING (AMAN, MENIPIS, HABIS)
-  const cycleToppingStatus = (id) => {
-    const updated = toppings.map(t => {
-      if (t.id === id) {
-        if (t.status === 'Aman') return { ...t, status: 'Menipis', color: '#f59e0b', pct: 40 };
-        if (t.status === 'Menipis') return { ...t, status: 'Habis', color: '#ef4444', pct: 0 };
-        return { ...t, status: 'Aman', color: '#10b981', pct: 100 };
-      }
-      return t;
-    });
+  // 1. UPDATE STATUS TOPPING (AMAN -> MENIPIS -> HABIS) KE SUPABASE
+  const cycleToppingStatus = async (id) => {
+    const target = toppings.find(t => t.id === id);
+    if (!target) return;
+
+    let nextStatus = 'Aman';
+    let nextColor = '#10b981';
+    let nextPct = 100;
+
+    if (target.status === 'Aman') {
+      nextStatus = 'Menipis';
+      nextColor = '#f59e0b';
+      nextPct = 40;
+    } else if (target.status === 'Menipis') {
+      nextStatus = 'Habis';
+      nextColor = '#ef4444';
+      nextPct = 0;
+    }
+
+    const updated = toppings.map(t => 
+      t.id === id ? { ...t, status: nextStatus, color: nextColor, pct: nextPct } : t
+    );
     setToppings(updated);
-    localStorage.setItem('siboy_toppings', JSON.stringify(updated));
-    window.dispatchEvent(new Event('storage'));
+
+    try {
+      await fetch('/api/toppings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id,
+          status: nextStatus,
+          color: nextColor,
+          pct: nextPct
+        }),
+      });
+    } catch (err) {
+      console.error('Gagal update topping ke database:', err);
+      fetchDbData();
+    }
   };
 
-  const handleAddTopping = () => {
+  // 2. TAMBAH JENIS TOPPING BARU KE SUPABASE
+  const handleAddTopping = async () => {
     if (!newToppingName.trim()) return setToppingError('Nama tidak boleh kosong.');
-    const newEntry = { id: Date.now(), name: newToppingName.trim(), status: 'Aman', color: '#10b981', pct: 100 };
-    const updated = [...toppings, newEntry];
-    setToppings(updated);
-    localStorage.setItem('siboy_toppings', JSON.stringify(updated));
-    window.dispatchEvent(new Event('storage'));
-    setNewToppingName(''); 
-    setToppingError('');
+
+    try {
+      const res = await fetch('/api/toppings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newToppingName.trim() }),
+      });
+      const data = await res.json();
+
+      if (data.success && data.data) {
+        setToppings(prev => [...prev, data.data]);
+        setNewToppingName(''); 
+        setToppingError('');
+      } else {
+        setToppingError(data.error || 'Gagal menambahkan topping.');
+      }
+    } catch (err) {
+      console.error('Gagal tambah topping ke database:', err);
+      setToppingError('Koneksi database bermasalah.');
+    }
   };
 
-  const handleDeleteTopping = (id) => {
-    const updated = toppings.filter(t => t.id !== id);
-    setToppings(updated);
-    localStorage.setItem('siboy_toppings', JSON.stringify(updated));
-    window.dispatchEvent(new Event('storage'));
+  // 3. HAPUS TOPPING DARI SUPABASE
+  const handleDeleteTopping = async (id) => {
+    const backup = [...toppings];
+    setToppings(prev => prev.filter(t => t.id !== id));
+
+    try {
+      const res = await fetch(`/api/toppings?id=${id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error);
+      }
+    } catch (err) {
+      console.error('Gagal menghapus topping dari database:', err);
+      setToppings(backup);
+      alert('Gagal menghapus topping.');
+    }
   };
 
   if (!isMounted) return null;
@@ -344,7 +413,6 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-[#faf9f6] text-slate-900 relative pb-16 overflow-x-hidden" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
       
-      {/* Background Grid Accent */}
       <div className="absolute inset-0 pointer-events-none z-0" style={{ backgroundSize: '32px 32px', backgroundImage: 'linear-gradient(to right, rgba(0, 0, 0, 0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(0, 0, 0, 0.04) 1px, transparent 1px)' }} />
 
       <div className={`max-w-7xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8 relative z-10 space-y-6 transition-all duration-300 ${isDrawerOpen || isSidebarOpen ? 'opacity-40 blur-sm pointer-events-none' : ''}`}>
@@ -385,9 +453,7 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* Action Kanan: Kalender & Toggle Mode */}
           <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-            
             <button 
               type="button"
               onClick={toggleDemoMode}
@@ -402,7 +468,6 @@ export default function AdminDashboard() {
 
             <div className="w-px h-6 bg-slate-200 hidden sm:block"></div>
 
-            {/* Filter Kalender Popover */}
             <div className="relative">
               <button 
                 type="button" 
@@ -454,7 +519,7 @@ export default function AdminDashboard() {
               )}
             </div>
 
-            {/* Toggle Status Buka / Tutup */}
+            {/* Toggle Status Buka / Tutup Global */}
             <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 px-2 py-1.5 rounded-full">
               <span className={`text-[10px] font-black uppercase tracking-wider ml-1 ${isOpen ? 'text-emerald-600' : 'text-slate-400'}`}>
                 {isOpen ? 'Buka' : 'Tutup'}
@@ -518,8 +583,6 @@ export default function AdminDashboard() {
 
         {/* AREA GRAFIK */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-          
-          {/* Wave Jam Ramai */}
           <div className="lg:col-span-5 bg-white rounded-3xl border-2 border-slate-100 p-5 sm:p-6 shadow-sm flex flex-col justify-between relative">
             <div className="flex items-start justify-between pb-3 border-b border-slate-100">
               <div>
@@ -575,7 +638,6 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* Siklus Harian */}
           <div className="lg:col-span-3 bg-white rounded-3xl border-2 border-slate-100 p-5 sm:p-6 shadow-sm flex flex-col justify-between">
             <div className="pb-3 border-b border-slate-100">
               <h3 className="text-sm font-black uppercase tracking-wider text-slate-800" style={{ fontFamily: "'Montserrat', sans-serif" }}>Siklus</h3>
@@ -601,7 +663,6 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* Donut Chart: Kardus / Porsi */}
           <div className="lg:col-span-4 bg-white rounded-3xl border-2 border-slate-100 p-5 sm:p-6 shadow-sm flex flex-col sm:flex-row gap-6 items-center">
             <div className="flex-1 w-full text-left sm:border-r border-slate-100 sm:pr-4">
               <div className="pb-2 border-b border-slate-100 mb-3">
@@ -635,12 +696,12 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* STATUS BAHAN TOPPING */}
+        {/* STATUS BAHAN TOPPING (TERHUBUNG KE SUPABASE) */}
         <div className="bg-white rounded-3xl border-2 border-slate-100 p-5 sm:p-6 shadow-sm">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 mb-4 border-b border-slate-100">
             <div>
               <h3 className="text-sm font-black uppercase tracking-wider text-slate-800" style={{ fontFamily: "'Montserrat', sans-serif" }}>Ketersediaan Topping</h3>
-              <p className="text-[11px] font-bold text-slate-400 mt-0.5">Klik kartu untuk ubah status instan atau kelola lewat Panel.</p>
+              <p className="text-[11px] font-bold text-slate-400 mt-0.5">Klik kartu untuk ubah status instan (Aman, Menipis, Habis). Langsung sinkron ke HP pembeli.</p>
             </div>
             <button 
               type="button" 
@@ -743,15 +804,28 @@ export default function AdminDashboard() {
             </div>
           </section>
 
+          {/* BAGIAN TAMBAH & KELOLA BAHAN TOPPING */}
           <section className="space-y-4">
             <div className="border-b border-slate-100 pb-2">
               <h3 className="text-xs font-black uppercase tracking-widest text-slate-800">Kelola Bahan Topping</h3>
-              <p className="text-[10px] font-bold text-slate-400">Bahan 'Habis' otomatis terkunci dan tidak bisa dipilih kasir</p>
+              <p className="text-[10px] font-bold text-slate-400">Bahan 'Habis' otomatis terkunci dan tidak bisa dipilih pembeli</p>
             </div>
 
             <div className="flex gap-2">
-              <input type="text" placeholder="Ketik topping baru..." value={newToppingName} onChange={(e) => setNewToppingName(e.target.value)} className="flex-1 text-xs font-bold px-3 py-2.5 rounded-xl border border-slate-200 outline-none focus:border-red-500 bg-slate-50" />
-              <button type="button" onClick={handleAddTopping} className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase cursor-pointer"><Plus className="w-4 h-4" /></button>
+              <input 
+                type="text" 
+                placeholder="Ketik topping baru..." 
+                value={newToppingName} 
+                onChange={(e) => setNewToppingName(e.target.value)} 
+                className="flex-1 text-xs font-bold px-3 py-2.5 rounded-xl border border-slate-200 outline-none focus:border-red-500 bg-slate-50" 
+              />
+              <button 
+                type="button" 
+                onClick={handleAddTopping} 
+                className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
             </div>
             {toppingError && <p className="text-[10px] text-red-500 font-bold">{toppingError}</p>}
 
